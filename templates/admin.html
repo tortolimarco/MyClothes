@@ -59,7 +59,7 @@
             <button type="button" class="admin-nav-btn active" onclick="mostraSezioneAdmin('ordini-attivi', this)">📦 Ordini Attivi</button>
             <button type="button" class="admin-nav-btn" onclick="mostraSezioneAdmin('ordini-archiviati', this)">📁 Ordini Archiviati</button>
             <button type="button" class="admin-nav-btn" onclick="mostraSezioneAdmin('chat-clienti', this)">💬 Chat Clienti</button>
-            <button type="button" class="admin-nav-btn" onclick="mostraSezioneAdmin('utenti-registrati', this)">👥 Utenti & Account</button>
+            <button type="button" class="admin-nav-btn" onclick="mostraSezioneAdmin('utenti-registrati', this)">👥 Utenti & Visitatori</button>
             <button type="button" class="admin-nav-btn" onclick="mostraSezioneAdmin('recensioni-clienti', this)">⭐ Recensioni</button>
         </div>
 
@@ -101,11 +101,16 @@
             </div>
         </div>
 
-        <!-- SEZIONE UTENTI & ACCOUNT -->
+        <!-- SEZIONE UTENTI & VISITATORI -->
         <div id="sec-utenti-registrati" class="admin-section">
-            <h2>👥 Registro Utenti e Account Creati</h2>
-            <p style="margin-bottom: 20px; color: #64748b;">Elenco completo di tutti gli utenti entrati e registrati nel sito.</p>
+            <h2>👥 Registro Utenti Registrati e Visitatori</h2>
+            <p style="margin-bottom: 20px; color: #64748b;">Monitora gli account con credenziali e gli utenti che visitano il sito senza registrazione.</p>
+            
+            <h3 style="font-size: 1.2rem; color: #0f172a; margin-top: 20px; margin-bottom: 10px;">✨ Account Registrati (Email e Password)</h3>
             <div id="adminUtentiContainer"></div>
+
+            <h3 style="font-size: 1.2rem; color: #0f172a; margin-top: 30px; margin-bottom: 10px;">🌐 Visitatori / Utenti non registrati (Solo accesso al sito)</h3>
+            <div id="adminVisitatoriContainer"></div>
         </div>
 
         <!-- SEZIONE RECENSIONI -->
@@ -227,23 +232,40 @@
                     sidebar.innerHTML = sidebarHtml;
                 }
 
-                // 4. Utenti e Account Registrati
+                // 4. Utenti Registrati
                 const utentiContainer = document.getElementById('adminUtentiContainer');
                 if(data.lista_utenti.length === 0) {
-                    utentiContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun account creato sul sito finora.</p>';
+                    utentiContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun account con email registrato finora.</p>';
                 } else {
                     let utentiHtml = '';
                     data.lista_utenti.forEach(u => {
                         utentiHtml += `<div class="user-admin-card">
                             <p style="font-weight: 800; color: #6366f1; font-size: 1.1rem;">✉️ Email: ${u.email}</p>
                             <p><strong>🔒 Password:</strong> ${u.password}</p>
-                            <p style="font-size: 0.8rem; color: #64748b;">ID Utente: ${u.user_id}</p>
+                            <p style="font-size: 0.8rem; color: #64748b;">ID Utente: ${u.user_id} | Registrato il: ${u.data}</p>
                         </div>`;
                     });
                     utentiContainer.innerHTML = utentiHtml;
                 }
 
-                // 5. Recensioni Clienti
+                // 5. Visitatori non registrati
+                const visitatoriContainer = document.getElementById('adminVisitatoriContainer');
+                if(data.visitatori_non_registrati.length === 0) {
+                    visitatoriContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun visitatore anonimo recente.</p>';
+                } else {
+                    let visHtml = '';
+                    data.visitatori_non_registrati.forEach(v => {
+                        visHtml += `<div class="user-admin-card" style="background: #fffbeb; border-color: #fde68a;">
+                            <p style="font-weight: 700; color: #b45309;">🌐 Visitatore / Utente Senza Account</p>
+                            <p><strong>💻 Dispositivo (Browser/OS):</strong> ${v.user_agent}</p>
+                            <p><strong>🌍 Indirizzo IP:</strong> ${v.ip}</p>
+                            <p style="font-size: 0.8rem; color: #64748b;">ID Sessione: ${v.user_id} | Ultimo accesso: ${v.ultimo_accesso}</p>
+                        </div>`;
+                    });
+                    visitatoriContainer.innerHTML = visHtml;
+                }
+
+                // 6. Recensioni Clienti
                 const recensioniContainer = document.getElementById('adminRecensioniContainer');
                 if(data.lista_recensioni.length === 0) {
                     recensioniContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessuna recensione pubblicata dai clienti.</p>';
