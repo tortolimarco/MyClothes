@@ -7,7 +7,7 @@ app.secret_key = "chiave_segreta_super_sicura_myclothes"
 ADMIN_PASSWORD = "GhiaccioBlu6767"
 
 UTENTI = {}           # email -> {'password': str, 'user_id': str}
-CHAT_PER_UTENTE = {}  # user_id -> lista messaggi
+CHAT_PER_UTENTE = {}  # user_id -> lista messaggi unita [{'mittente': 'cliente'/'admin', 'testo': str, 'immagine': str}]
 ORDINI_PER_UTENTE = {}# user_id -> lista ordini attivi
 ARCHIVIO_ORDINI = []  # Lista globale ordini archiviati (admin)
 TUTTI_GLI_ORDINI = [] # Lista globale admin
@@ -77,7 +77,7 @@ def registra_utente():
         return redirect(url_for('home'))
         
     if email in UTENTI:
-        session['auth_error'] = "Questa email è già registrata! Effettua il login inserendo la password."
+        session['auth_error'] = "Questa email è già registrata! Effettua il login."
         session['active_tab'] = 'register'
         return redirect(url_for('home'))
         
@@ -94,7 +94,7 @@ def registra_utente():
 
 @app.route('/login-google', methods=['POST'])
 def login_google():
-    data = request.get_json()
+    data = request.get_json() or {}
     email = data.get('email', '').strip().lower()
     password = data.get('password', '').strip()
     
@@ -122,7 +122,7 @@ def logout_utente():
 @app.route('/invia', methods=['POST'])
 def invia():
     uid = get_user_id()
-    data = request.get_json()
+    data = request.get_json() or {}
     testo = data.get('testo', '')
     immagine = data.get('immagine', '')
     
@@ -130,7 +130,12 @@ def invia():
         CHAT_PER_UTENTE[uid] = []
         
     if testo or immagine:
-        CHAT_PER_UTENTE[uid].append({"testo": testo, "immagine": immagine, "risposta": ""})
+        # Aggiunge il messaggio unificato nella chat del cliente
+        CHAT_PER_UTENTE[uid].append({
+            "mittente": "cliente",
+            "testo": testo,
+            "immagine": immagine
+        })
     return jsonify({"status": "success"})
 
 @app.route('/registra-pagamento', methods=['POST'])
@@ -140,7 +145,7 @@ def registra_pagamento():
         return jsonify({"status": "error", "message": "Devi accedere per acquistare."}), 401
         
     uid = get_user_id()
-    data = request.get_json()
+    data = request.get_json() or {}
     
     CONTATORE_ORDINI += 1
     codice_ordine = f"#{CONTATORE_ORDINI:04d}"
@@ -206,19 +211,24 @@ def elimina_ordine_cliente(ordine_id):
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
     if session.get('admin_logged_in'):
+        # Mappa user_id all'email del cliente per mostrarla in rubrica chat
+        email_per_uid = {u_data['user_id']: email for email, u_data in UTENTI.items()}
         return render_template('admin.html', 
                                tutti_ordini=TUTTI_GLI_ORDINI, 
                                archivio_ordini=ARCHIVIO_ORDINI,
-                               chat_per_utente=CHAT_PER_UTENTE)
+                               chat_per_utente=CHAT_PER_UTENTE,
+                               email_per_uid=email_per_uid)
     
     errore = False
     if request.method == 'POST':
         if request.form.get('password') == ADMIN_PASSWORD:
             session['admin_logged_in'] = True
+            email_per_uid = {u_data['user_id']: email for email, u_data in UTENTI.items()}
             return render_template('admin.html', 
                                    tutti_ordini=TUTTI_GLI_ORDINI, 
                                    archivio_ordini=ARCHIVIO_ORDINI,
-                                   chat_per_utente=CHAT_PER_UTENTE)
+                                   chat_per_utente=CHAT_PER_UTENTE,
+                                   email_per_uid=email_per_uid)
         else:
             errore = True
             
@@ -295,19 +305,20 @@ def archivia_ordine(ordine_id):
             
     return redirect(url_for('admin'))
 
-@app.route('/rispondi/<user_id>/<int:index>', methods=['POST'])
-def rispondi(user_id, index):
+@app.route('/rispondi-chat/<user_id>', methods=['POST'])
+def rispondi_chat(user_id):
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin'))
         
-    testo_risposta = request.form.get('risposta')
-    if user_id in CHAT_PER_UTENTE and 0 <= index < len(CHAT_PER_UTENTE[user_id]):
-        CHAT_PER_UTENTE[user_id][index]['risposta'] = testo_risposta
+    testo_risposta = request.form.get('risposta', '').strip()
+    if testo_risposta and user_id in CHAT_PER_UTENTE:
+        CHAT_PER_UTENTE[user_id].append({
+            "mittente": "admin",
+            "testo": testo_risposta,
+            "immagine": ""
+        })
         
-    return render_template('admin.html', 
-                           tutti_ordini=TUTTI_GLI_ORDINI, 
-                           archivio_ordini=ARCHIVIO_ORDINI,
-                           chat_per_utente=CHAT_PER_UTENTE)
+    return redirect(url_for('admin'))
 
 if __name__ == '__main__':
     app.run(debug=True)
