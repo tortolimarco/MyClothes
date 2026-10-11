@@ -66,128 +66,56 @@
         <div id="sec-ordini-attivi" class="admin-section active">
             <h2>Gestione Ordini in Corso</h2>
             <p style="margin-bottom: 20px; color: #64748b;">Verifica i pagamenti, aggiorna le spedizioni o annulla gli ordini.</p>
-
-            {% if not tutti_ordini %}
-                <p style="color: #94a3b8; font-style: italic;">Nessun ordine attivo al momento.</p>
-            {% endif %}
-
-            {% for ord in tutti_ordini %}
-            <div class="ordine-admin-card">
-                <p style="font-size: 1.2rem; color: #6366f1; font-weight: 800; margin-bottom: 8px;">Codice Ordine: {{ ord.codice }}</p>
-                <p><strong>🛒 Articolo:</strong> <span style="font-weight:700;">{{ ord.prodotto }}</span></p>
-                <p><strong>💰 Importo:</strong> <span style="color: #059669; font-weight:700; font-size: 1.1rem;">€{{ ord.importo }}</span></p>
-                <p><strong>💳 Metodo:</strong> {{ ord.metodo }} | <strong>✉️ Email Cliente:</strong> {{ ord.email }}</p>
-                
-                {% if ord.nome %}
-                    <p><strong>👤 Spedizione a:</strong> {{ ord.nome }} - {{ ord.indirizzo }}, {{ ord.citta }}</p>
-                {% else %}
-                    <p style="color: #d97706; font-style: italic;">Indirizzo non ancora inserito dal cliente.</p>
-                {% endif %}
-
-                <p><strong>📌 Stato:</strong> <span style="font-weight:750;">{{ ord.stato }}</span></p>
-
-                {% if ord.stato == 'Annullato' %}
-                    <p style="color: #ef4444; font-weight: 600;">Motivo annullamento: {{ ord.motivo_annullamento }}</p>
-                {% endif %}
-
-                <div style="margin-top: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                    {% if ord.stato == 'In attesa di verifica pagamento' %}
-                        <form action="/conferma-pagamento/{{ ord.id }}" method="POST">
-                            <button type="submit" class="btn" style="background: #059669;">✔️ Conferma Pagamento</button>
-                        </form>
-                    {% endif %}
-
-                    {% if ord.stato != 'Annullato' %}
-                        <form action="/aggiorna-stato/{{ ord.id }}" method="POST" style="display: flex; gap: 10px; align-items: center;">
-                            <select name="nuovo_stato" class="select-stato">
-                                <option value="In elaborazione" {% if ord.stato == 'In elaborazione' %}selected{% endif %}>In elaborazione</option>
-                                <option value="Spedito" {% if ord.stato == 'Spedito' %}selected{% endif %}>Spedito</option>
-                                <option value="Arrivato" {% if ord.stato == 'Arrivato' %}selected{% endif %}>Arrivato</option>
-                            </select>
-                            <button type="submit" class="btn">Aggiorna Stato</button>
-                        </form>
-
-                        <form action="/annulla-ordine/{{ ord.id }}" method="POST" style="display: flex; gap: 8px; align-items: center;">
-                            <input type="text" name="motivo" placeholder="Motivo annullamento..." required style="padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px;">
-                            <button type="submit" class="btn btn-danger">❌ Annulla</button>
-                        </form>
-                    {% endif %}
-
-                    {% if ord.stato == 'Arrivato' or ord.stato == 'Annullato' %}
-                        <form action="/archivia-ordine/{{ ord.id }}" method="POST">
-                            <button type="submit" class="btn btn-archive">📂 Archivia Ordine</button>
-                        </form>
-                    {% endif %}
-                </div>
+            <div id="adminOrdiniAttiviContainer">
+                <!-- Iniettato via JS in tempo reale -->
             </div>
-            {% endfor %}
         </div>
 
         <!-- SEZIONE ORDINI ARCHIVIATI -->
         <div id="sec-ordini-archiviati" class="admin-section">
             <h2>📁 Archivio Ordini</h2>
             <p style="margin-bottom: 20px; color: #64748b;">Storico separato degli ordini completati o annullati.</p>
-
-            {% if not archivio_ordini %}
-                <p style="color: #94a3b8; font-style: italic;">Nessun ordine presente in archivio.</p>
-            {% endif %}
-
-            {% for ord in archivio_ordini %}
-            <div class="ordine-admin-card" style="background: #f1f5f9;">
-                <p style="font-size: 1.1rem; color: #64748b; font-weight: 800;">Codice Ordine: {{ ord.codice }}</p>
-                <p><strong>🛒 Articolo:</strong> {{ ord.prodotto }} | <strong>Importo:</strong> €{{ ord.importo }} | <strong>Cliente:</strong> {{ ord.email }}</p>
-                <p><strong>📌 Stato Finale:</strong> {{ ord.stato }}</p>
-                {% if ord.motivo_annullamento %}
-                    <p style="color: #ef4444; font-size: 0.85rem;">Motivo annullamento: {{ ord.motivo_annullamento }}</p>
-                {% endif %}
+            <div id="adminOrdiniArchiviatiContainer">
+                <!-- Iniettato via JS in tempo reale -->
             </div>
-            {% endfor %}
         </div>
 
-        <!-- SEZIONE CHAT CLIENTE (STILE WHATSAPP) -->
+        <!-- SEZIONE CHAT CLIENTE -->
         <div id="sec-chat-clienti" class="admin-section">
             <h2>💬 Chat Private con i Clienti</h2>
             <p style="margin-bottom: 20px; color: #64748b;">Seleziona un cliente dalla lista per aprire la chat unita.</p>
             
-            {% if not chat_per_utente %}
-                <p style="color: #94a3b8; font-style: italic;">Nessuna chat attiva al momento.</p>
-            {% else %}
-                <div class="whatsapp-container">
-                    <!-- Colonna Contatti -->
-                    <div class="chat-sidebar">
-                        {% for user_id, messaggi in chat_per_utente.items() %}
-                            <div class="chat-contact" id="contact-{{ user_id }}" onclick="selezionaChat('{{ user_id }}')">
-                                <div class="chat-contact-title">👤 {{ email_per_uid.get(user_id, 'Cliente Anonimo') }}</div>
-                                <div class="chat-contact-sub">ID: {{ user_id[:8] }}...</div>
-                            </div>
-                        {% endfor %}
+            <div class="whatsapp-container">
+                <!-- Colonna Contatti -->
+                <div class="chat-sidebar" id="adminChatSidebar">
+                    <!-- Iniettato via JS -->
+                </div>
+
+                <!-- Area Principale Chat -->
+                <div class="chat-main-area">
+                    <div id="no-chat-box" class="no-chat-selected">
+                        Seleziona una chat dalla lista a sinistra
                     </div>
 
-                    <!-- Area Principale Chat -->
-                    <div class="chat-main-area">
-                        <div id="no-chat-box" class="no-chat-selected">
-                            Seleziona una chat dalla lista a sinistra
-                        </div>
-
-                        <div id="active-chat-pane" style="display: none; height: 100%; display: flex; flex-direction: column;">
-                            <div class="chat-messages-box" id="adminChatMessages">
-                                <!-- I messaggi verranno iniettati via JS -->
-                            </div>
-
-                            <div class="chat-input-bar">
-                                <input type="text" id="adminInputRisposta" placeholder="Scrivi un messaggio..." autocomplete="off" onkeypress="handleAdminKeypress(event)">
-                                <button type="button" class="btn" style="background:#00a884;" onclick="inviaRispostaAdmin()">Invia</button>
-                            </div>
+                    <div id="active-chat-pane" style="display: none; height: 100%; flex-direction: column;">
+                        <div class="chat-messages-box" id="adminChatMessages"></div>
+                        <div class="chat-input-bar">
+                            <input type="text" id="adminInputRisposta" placeholder="Scrivi un messaggio..." autocomplete="off" onkeypress="handleAdminKeypress(event)">
+                            <button type="button" class="btn" style="background:#00a884;" onclick="inviaRispostaAdmin()">Invia</button>
                         </div>
                     </div>
                 </div>
-            {% endif %}
+            </div>
         </div>
     </div>
 
     <script>
         let currentSelectedUserId = null;
-        let chatInterval = null;
+
+        document.addEventListener("DOMContentLoaded", function() {
+            aggiornaDatiAdmin();
+            setInterval(aggiornaDatiAdmin, 3000);
+        });
 
         function mostraSezioneAdmin(idSezione, btnElement) {
             document.querySelectorAll('.admin-section').forEach(sec => sec.classList.remove('active'));
@@ -196,9 +124,110 @@
             if(btnElement) btnElement.classList.add('active');
         }
 
-        function selezionaChat(userId) {
+        function aggiornaDatiAdmin() {
+            fetch('/api/admin/dati')
+            .then(res => {
+                if(!res.ok) return;
+                return res.json();
+            })
+            .then(data => {
+                if(!data) return;
+
+                // 1. Renderizza Ordini Attivi
+                const attiviContainer = document.getElementById('adminOrdiniAttiviContainer');
+                if(data.tutti_ordini.length === 0) {
+                    attiviContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun ordine attivo al momento.</p>';
+                } else {
+                    let html = '';
+                    data.tutti_ordini.forEach(ord => {
+                        html += `<div class="ordine-admin-card">
+                            <p style="font-size: 1.2rem; color: #6366f1; font-weight: 800; margin-bottom: 8px;">Codice Ordine: ${ord.codice}</p>
+                            <p><strong>🛒 Articolo:</strong> <span style="font-weight:700;">${ord.prodotto}</span></p>
+                            <p><strong>💰 Importo:</strong> <span style="color: #059669; font-weight:700; font-size: 1.1rem;">€${ord.importo}</span></p>
+                            <p><strong>💳 Metodo:</strong> ${ord.metodo} | <strong>✉️ Email Cliente:</strong> ${ord.email}</p>`;
+                        
+                        if(ord.nome) {
+                            html += `<p><strong>👤 Spedizione a:</strong> ${ord.nome} - ${ord.indirizzo}, ${ord.citta}</p>`;
+                        } else {
+                            html += `<p style="color: #d97706; font-style: italic;">Indirizzo non ancora inserito dal cliente.</p>`;
+                        }
+
+                        html += `<p><strong>📌 Stato:</strong> <span style="font-weight:750;">${ord.stato}</span></p>`;
+                        if(ord.stato === 'Annullato') {
+                            html += `<p style="color: #ef4444; font-weight: 600;">Motivo annullamento: ${ord.motivo_annullamento}</p>`;
+                        }
+
+                        html += `<div style="margin-top: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">`;
+                        if(ord.stato === 'In attesa di verifica pagamento') {
+                            html += `<form action="/conferma-pagamento/${ord.id}" method="POST"><button type="submit" class="btn" style="background: #059669;">✔️ Conferma Pagamento</button></form>`;
+                        }
+                        if(ord.stato !== 'Annullato') {
+                            html += `<form action="/aggiorna-stato/${ord.id}" method="POST" style="display: flex; gap: 10px; align-items: center;">
+                                <select name="nuovo_stato" class="select-stato">
+                                    <option value="In elaborazione" ${ord.stato === 'In elaborazione' ? 'selected' : ''}>In elaborazione</option>
+                                    <option value="Spedito" ${ord.stato === 'Spedito' ? 'selected' : ''}>Spedito</option>
+                                    <option value="Arrivato" ${ord.stato === 'Arrivato' ? 'selected' : ''}>Arrivato</option>
+                                </select>
+                                <button type="submit" class="btn">Aggiorna Stato</button>
+                            </form>
+                            <form action="/annulla-ordine/${ord.id}" method="POST" style="display: flex; gap: 8px; align-items: center;">
+                                <input type="text" name="motivo" placeholder="Motivo annullamento..." required style="padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px;">
+                                <button type="submit" class="btn btn-danger">❌ Annulla</button>
+                            </form>`;
+                        }
+                        if(ord.stato === 'Arrivato' || ord.stato === 'Annullato') {
+                            html += `<form action="/archivia-ordine/${ord.id}" method="POST"><button type="submit" class="btn btn-archive">📂 Archivia Ordine</button></form>`;
+                        }
+                        html += `</div></div>`;
+                    });
+                    attiviContainer.innerHTML = html;
+                }
+
+                // 2. Renderizza Ordini Archiviati
+                const archiviatiContainer = document.getElementById('adminOrdiniArchiviatiContainer');
+                if(data.archivio_ordini.length === 0) {
+                    archiviatiContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun ordine presente in archivio.</p>';
+                } else {
+                    let htmlArch = '';
+                    data.archivio_ordini.forEach(ord => {
+                        htmlArch += `<div class="ordine-admin-card" style="background: #f1f5f9;">
+                            <p style="font-size: 1.1rem; color: #64748b; font-weight: 800;">Codice Ordine: ${ord.codice}</p>
+                            <p><strong>🛒 Articolo:</strong> ${ord.prodotto} | <strong>Importo:</strong> €${ord.importo} | <strong>Cliente:</strong> ${ord.email}</p>
+                            <p><strong>📌 Stato Finale:</strong> ${ord.stato}</p>`;
+                        if(ord.motivo_annullamento) {
+                            htmlArch += `<p style="color: #ef4444; font-size: 0.85rem;">Motivo annullamento: ${ord.motivo_annullamento}</p>`;
+                        }
+                        htmlArch += `</div>`;
+                    });
+                    archiviatiContainer.innerHTML = htmlArch;
+                }
+
+                // 3. Renderizza Sidebar Contatti Chat
+                const sidebar = document.getElementById('adminChatSidebar');
+                if(Object.keys(data.chat_per_utente).length === 0) {
+                    sidebar.innerHTML = '<p style="padding: 15px; color: #94a3b8; font-style: italic;">Nessuna chat attiva.</p>';
+                } else {
+                    let sidebarHtml = '';
+                    for (const [userId, messaggi] of Object.entries(data.chat_per_utente)) {
+                        let emailCli = data.email_per_uid[userId] || 'Cliente Anonimo';
+                        let activeClass = currentSelectedUserId === userId ? 'active' : '';
+                        sidebarHtml += `<div class="chat-contact ${activeClass}" id="contact-${userId}" onclick="selezionaChat('${userId}', '${emailCli}')">
+                            <div class="chat-contact-title">👤 ${emailCli}</div>
+                            <div class="chat-contact-sub">ID: ${userId.substring(0, 8)}...</div>
+                        </div>`;
+                    }
+                    sidebar.innerHTML = sidebarHtml;
+                }
+
+                // Se c'è una chat aperta, aggiorna i messaggi in tempo reale
+                if(currentSelectedUserId) {
+                    caricaMessaggiAdminCorrente();
+                }
+            });
+        }
+
+        function selezionaChat(userId, email) {
             currentSelectedUserId = userId;
-            
             document.getElementById('no-chat-box').style.display = 'none';
             document.getElementById('active-chat-pane').style.display = 'flex';
             
@@ -206,13 +235,10 @@
             const contactCard = document.getElementById('contact-' + userId);
             if (contactCard) contactCard.classList.add('active');
 
-            // Carica immediatamente la chat e avvia il timer di aggiornamento automatico
-            caricaMessaggiAdmin();
-            if(chatInterval) clearInterval(chatInterval);
-            chatInterval = setInterval(caricaMessaggiAdmin, 3000);
+            caricaMessaggiAdminCorrente();
         }
 
-        function caricaMessaggiAdmin() {
+        function caricaMessaggiAdminCorrente() {
             if(!currentSelectedUserId) return;
 
             fetch('/api/admin/chat/' + currentSelectedUserId)
@@ -255,7 +281,7 @@
             }).then(res => {
                 if(res.ok) {
                     inputField.value = '';
-                    caricaMessaggiAdmin();
+                    caricaMessaggiAdminCorrente();
                 }
             });
         }
