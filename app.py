@@ -18,7 +18,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS utenti (
             email TEXT PRIMARY KEY,
             password TEXT NOT NULL,
-            user_id TEXT NOT NULL
+            user_id TEXT NOT NULL,
+            data_creazione TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     # Tabella Chat
@@ -350,7 +351,6 @@ def invia_recensione(ordine_id):
         codice_ordine = row[0]
         prodotto = row[1]
         
-        # Inserisci Recensione
         cursor.execute('''
             INSERT INTO recensioni (ordine_id, codice_ordine, email, prodotto, stelle, commento, immagine)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -436,6 +436,19 @@ def archivia_ordine(ordine_id):
     
     return redirect(url_for('admin'))
 
+@app.route('/elimina-recensione/<int:rec_id>', methods=['POST'])
+def elimina_recensione(rec_id):
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin'))
+        
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM recensioni WHERE id = ?', (rec_id,))
+    conn.commit()
+    conn.close()
+    
+    return redirect(url_for('admin'))
+
 @app.route('/api/admin/dati', methods=['GET'])
 def api_admin_dati():
     if not session.get('admin_logged_in'):
@@ -444,6 +457,7 @@ def api_admin_dati():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
+    # Prendi tutti gli Ordini
     cursor.execute('SELECT id, codice, user_id, email, prodotto, importo, metodo, stato, motivo_annullamento, nome, indirizzo, citta FROM ordini')
     rows = cursor.fetchall()
     
@@ -461,6 +475,7 @@ def api_admin_dati():
         else:
             tutti_ordini.append(ord_obj)
             
+    # Prendi tutte le Chat
     cursor.execute('SELECT user_id, mittente, testo, immagine FROM chat')
     chat_rows = cursor.fetchall()
     chat_per_utente = {}
@@ -470,9 +485,19 @@ def api_admin_dati():
             chat_per_utente[u_id] = []
         chat_per_utente[u_id].append({"mittente": cr[1], "testo": cr[2], "immagine": cr[3]})
         
-    cursor.execute('SELECT user_id, email FROM utenti')
+    # Prendi tutti gli Utenti Registrati
+    cursor.execute('SELECT email, password, user_id FROM utenti')
     user_rows = cursor.fetchall()
-    email_per_uid = {ur[0]: ur[1] for ur in user_rows}
+    lista_utenti = [{"email": ur[0], "password": ur[1], "user_id": ur[2]} for ur in user_rows]
+    email_per_uid = {ur[2]: ur[0] for ur in user_rows}
+
+    # Prendi tutte le Recensioni
+    cursor.execute('SELECT id, ordine_id, codice_ordine, email, prodotto, stelle, commento, immagine FROM recensioni ORDER BY id DESC')
+    rec_rows = cursor.fetchall()
+    lista_recensioni = [{
+        "id": r[0], "ordine_id": r[1], "codice_ordine": r[2], "email": r[3],
+        "prodotto": r[4], "stelle": r[5], "commento": r[6], "immagine": r[7]
+    } for r in rec_rows]
     
     conn.close()
     
@@ -480,6 +505,8 @@ def api_admin_dati():
         "tutti_ordini": tutti_ordini,
         "archivio_ordini": archivio_ordini,
         "chat_per_utente": chat_per_utente,
+        "lista_utenti": lista_utenti,
+        "lista_recensioni": lista_recensioni,
         "email_per_uid": email_per_uid
     })
 
