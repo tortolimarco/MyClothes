@@ -7,7 +7,7 @@ app.secret_key = "chiave_segreta_super_sicura_myclothes"
 ADMIN_PASSWORD = "GhiaccioBlu6767"
 
 UTENTI = {}           # email -> {'password': str, 'user_id': str}
-CHAT_PER_UTENTE = {}  # user_id -> lista messaggi unita [{'mittente': 'cliente'/'admin', 'testo': str, 'immagine': str}]
+CHAT_PER_UTENTE = {}  # user_id -> lista messaggi unita
 ORDINI_PER_UTENTE = {}# user_id -> lista ordini attivi
 ARCHIVIO_ORDINI = []  # Lista globale ordini archiviati (admin)
 TUTTI_GLI_ORDINI = [] # Lista globale admin
@@ -141,6 +141,11 @@ def invia():
 def api_chat_utente():
     uid = get_user_id()
     return jsonify(CHAT_PER_UTENTE.get(uid, []))
+
+@app.route('/api/ordini-utente', methods=['GET'])
+def api_ordini_utente():
+    uid = get_user_id()
+    return jsonify(ORDINI_PER_UTENTE.get(uid, []))
 
 @app.route('/registra-pagamento', methods=['POST'])
 def registra_pagamento():
@@ -307,6 +312,19 @@ def archivia_ordine(ordine_id):
             break
             
     return redirect(url_for('admin'))
+
+# API AJAX per aggiornamento in tempo reale del pannello admin
+@app.route('/api/admin/dati', methods=['GET'])
+def api_admin_dati():
+    if not session.get('admin_logged_in'):
+        return jsonify({"status": "error"}), 401
+    email_per_uid = {u_data['user_id']: email for email, u_data in UTENTI.items()}
+    return jsonify({
+        "tutti_ordini": TUTTI_GLI_ORDINI,
+        "archivio_ordini": ARCHIVIO_ORDINI,
+        "chat_per_utente": CHAT_PER_UTENTE,
+        "email_per_uid": email_per_uid
+    })
 
 @app.route('/api/admin/chat/<user_id>', methods=['GET'])
 def api_admin_get_chat(user_id):
