@@ -130,13 +130,17 @@ def invia():
         CHAT_PER_UTENTE[uid] = []
         
     if testo or immagine:
-        # Aggiunge il messaggio unificato nella chat del cliente
         CHAT_PER_UTENTE[uid].append({
             "mittente": "cliente",
             "testo": testo,
             "immagine": immagine
         })
     return jsonify({"status": "success"})
+
+@app.route('/api/chat-utente', methods=['GET'])
+def api_chat_utente():
+    uid = get_user_id()
+    return jsonify(CHAT_PER_UTENTE.get(uid, []))
 
 @app.route('/registra-pagamento', methods=['POST'])
 def registra_pagamento():
@@ -211,7 +215,6 @@ def elimina_ordine_cliente(ordine_id):
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
     if session.get('admin_logged_in'):
-        # Mappa user_id all'email del cliente per mostrarla in rubrica chat
         email_per_uid = {u_data['user_id']: email for email, u_data in UTENTI.items()}
         return render_template('admin.html', 
                                tutti_ordini=TUTTI_GLI_ORDINI, 
@@ -305,20 +308,30 @@ def archivia_ordine(ordine_id):
             
     return redirect(url_for('admin'))
 
-@app.route('/rispondi-chat/<user_id>', methods=['POST'])
-def rispondi_chat(user_id):
+@app.route('/api/admin/chat/<user_id>', methods=['GET'])
+def api_admin_get_chat(user_id):
     if not session.get('admin_logged_in'):
-        return redirect(url_for('admin'))
+        return jsonify({"status": "error"}), 401
+    return jsonify(CHAT_PER_UTENTE.get(user_id, []))
+
+@app.route('/api/admin/rispondi/<user_id>', methods=['POST'])
+def api_admin_rispondi(user_id):
+    if not session.get('admin_logged_in'):
+        return jsonify({"status": "error"}), 401
         
-    testo_risposta = request.form.get('risposta', '').strip()
-    if testo_risposta and user_id in CHAT_PER_UTENTE:
+    data = request.get_json() or {}
+    testo_risposta = data.get('risposta', '').strip()
+    
+    if testo_risposta:
+        if user_id not in CHAT_PER_UTENTE:
+            CHAT_PER_UTENTE[user_id] = []
         CHAT_PER_UTENTE[user_id].append({
             "mittente": "admin",
             "testo": testo_risposta,
             "immagine": ""
         })
-        
-    return redirect(url_for('admin'))
+        return jsonify({"status": "success"})
+    return jsonify({"status": "empty"}), 400
 
 if __name__ == '__main__':
     app.run(debug=True)
