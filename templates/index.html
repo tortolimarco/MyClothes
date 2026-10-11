@@ -36,9 +36,9 @@
         .section-title { font-size: 1.5rem; color: var(--primary); margin-bottom: 5px; font-weight: 800; }
         .section-desc { color: #64748b; font-size: 0.9rem; margin-bottom: 20px; }
         
-        .chat-messages { height: 350px; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; overflow-y: auto; background: #fafafa; margin-bottom: 20px; display: flex; flex-direction: column; gap: 15px; }
-        .message-bubble { padding: 12px 18px; border-radius: 14px; max-width: 80%; font-size: 0.95rem; }
-        .message-bubble.client { background: #e0e7ff; color: #3730a3; align-self: flex-start; }
+        .chat-messages { height: 350px; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; overflow-y: auto; background: #fafafa; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px; }
+        .message-bubble { padding: 12px 18px; border-radius: 14px; max-width: 80%; font-size: 0.95rem; word-break: break-word; }
+        .message-bubble.cliente { background: #e0e7ff; color: #3730a3; align-self: flex-start; }
         .message-bubble.admin { background: #d1fae5; color: #065f46; align-self: flex-end; }
         .message-bubble.system { background: #f1f5f9; color: #64748b; align-self: center; text-align: center; width: 100%; font-size: 0.85rem; }
         .chat-messages img { max-width: 200px; border-radius: 10px; margin-top: 8px; display: block; }
@@ -77,7 +77,6 @@
         .divider { text-align: center; border-bottom: 1px solid #e2e8f0; line-height: 0.1em; margin: 25px 0 20px; color: #94a3b8; font-size: 0.85rem; }
         .divider span { background: #fff; padding: 0 10px; }
 
-        /* ADATTAMENTO PER SMARTPHONE E TABLET */
         @media (max-width: 768px) {
             body { flex-direction: column; height: auto; overflow: auto; }
             sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid #e2e8f0; padding: 20px; }
@@ -121,7 +120,7 @@
 
     <main-content>
         
-        <!-- VISTA HOME / VETRINA CON GUIDA -->
+        <!-- VISTA HOME -->
         <div id="vista-home" class="view-section active">
             <div class="hero">
                 <h1>Qualsiasi capo desideri. 100% Affidabili.</h1>
@@ -162,18 +161,21 @@
                 <div class="chat-messages" id="chatMessages">
                     <div class="message-bubble system">Benvenuto su MyClothes! Chiedi un articolo e concorda i dettagli.</div>
                     {% for r in chat_utente %}
-                        <div class="message-bubble client">Tu: {{ r.testo }}
+                        <div class="message-bubble {{ r.mittente }}">
+                            {% if r.mittente == 'admin' %}
+                                <strong style="display:block; font-size:0.75rem; color:#065f46; margin-bottom:2px;">MyClothes (Venditore)</strong>
+                            {% else %}
+                                <strong style="display:block; font-size:0.75rem; color:#3730a3; margin-bottom:2px;">Tu</strong>
+                            {% endif %}
+                            {{ r.testo }}
                             {% if r.immagine %}<br><img src="{{ r.immagine }}" alt="Foto allegata">{% endif %}
                         </div>
-                        {% if r.risposta %}
-                            <div class="message-bubble admin">MyClothes (Venditore): {{ r.risposta }}</div>
-                        {% endif %}
                     {% endfor %}
                 </div>
 
                 <div class="chat-form">
                     <div class="chat-input-row">
-                        <input type="text" id="userInput" placeholder="Scrivi il capo desiderato...">
+                        <input type="text" id="userInput" placeholder="Scrivi il capo desiderato..." autocomplete="off">
                         <button type="button" class="btn" onclick="inviaRichiesta()">Invia</button>
                     </div>
                     <div class="file-upload-wrapper">
@@ -327,11 +329,11 @@
             if (target) {
                 target.style.display = 'block';
                 target.classList.add('active');
+                if(nomeVista === 'chat') scrollChatDown();
             }
             if(elementoBtn) elementoBtn.classList.add('active');
         }
 
-        // Inizializzazione corretta all'avvio
         document.addEventListener("DOMContentLoaded", function() {
             document.querySelectorAll('.view-section').forEach(el => {
                 if(!el.classList.contains('active')) {
@@ -340,21 +342,72 @@
                     el.style.display = 'block';
                 }
             });
+            scrollChatDown();
+            // Aggiornamento automatico chat utente ogni 3 secondi senza ricaricare la pagina
+            setInterval(aggiornaChatCliente, 3000);
         });
 
+        function scrollChatDown() {
+            const chatBox = document.getElementById('chatMessages');
+            if(chatBox) {
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        }
+
         function inviaRichiesta() {
-            const testo = document.getElementById('userInput').value.trim();
+            const inputField = document.getElementById('userInput');
+            const testo = inputField.value.trim();
             const fileInput = document.getElementById('imageFile');
+            
             if(!testo && fileInput.files.length === 0) { alert("Scrivi un messaggio o seleziona un'immagine."); return; }
+            
             if (fileInput.files.length > 0) {
                 const reader = new FileReader();
-                reader.onload = function(e) { inviaDatiAlServer(testo, e.target.result); };
+                reader.onload = function(e) { 
+                    inviaDatiAlServer(testo, e.target.result); 
+                };
                 reader.readAsDataURL(fileInput.files[0]);
-            } else { inviaDatiAlServer(testo, ""); }
+            } else { 
+                inviaDatiAlServer(testo, ""); 
+            }
         }
+
         function inviaDatiAlServer(testo, img) {
-            fetch('/invia', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testo: testo, immagine: img }) }).then(() => { location.reload(); });
+            fetch('/invia', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ testo: testo, immagine: img }) 
+            }).then(res => {
+                if(res.ok) {
+                    document.getElementById('userInput').value = '';
+                    document.getElementById('imageFile').value = '';
+                    aggiornaChatCliente();
+                }
+            });
         }
+
+        function aggiornaChatCliente() {
+            fetch('/api/chat-utente')
+            .then(res => res.json())
+            .then(data => {
+                const chatBox = document.getElementById('chatMessages');
+                if(!chatBox) return;
+                
+                let html = '<div class="message-bubble system">Benvenuto su MyClothes! Chiedi un articolo e concorda i dettagli.</div>';
+                data.forEach(r => {
+                    let mittenteLabel = r.mittente === 'admin' ? '<strong style="display:block; font-size:0.75rem; color:#065f46; margin-bottom:2px;">MyClothes (Venditore)</strong>' : '<strong style="display:block; font-size:0.75rem; color:#3730a3; margin-bottom:2px;">Tu</strong>';
+                    let imgTag = r.immagine ? `<br><img src="${r.immagine}" alt="Foto allegata">` : '';
+                    html += `<div class="message-bubble ${r.mittente}">${mittenteLabel}${r.testo}${imgTag}</div>`;
+                });
+                
+                const eraInFondo = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 50;
+                chatBox.innerHTML = html;
+                if(eraInFondo) {
+                    scrollChatDown();
+                }
+            });
+        }
+
         function apriLoginModal(tab) {
             mostraTabAuth(tab);
             document.getElementById('modalLoginUtente').style.display = 'flex';
@@ -375,30 +428,15 @@
         }
         function loginConGoogle() {
             let emailGoogle = prompt("Inserisci la tua email Google per accedere:");
-            if(!emailGoogle || !emailGoogle.includes('@')) { 
-                alert("Email non valida."); 
-                return; 
-            }
+            if(!emailGoogle || !emailGoogle.includes('@')) { alert("Email non valida."); return; }
             let passGoogle = prompt("Inserisci la tua password di accesso:");
-            if(!passGoogle) { 
-                alert("La password è obbligatoria per accedere."); 
-                return; 
-            }
+            if(!passGoogle) { alert("La password è obbligatoria per accedere."); return; }
 
             fetch('/login-google', {
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    email: emailGoogle.trim().toLowerCase(), 
-                    password: passGoogle.trim() 
-                })
-            }).then(res => { 
-                if(res.ok) { 
-                    location.reload(); 
-                } else {
-                    alert("Password o credenziali errate!");
-                }
-            });
+                body: JSON.stringify({ email: emailGoogle.trim().toLowerCase(), password: passGoogle.trim() })
+            }).then(res => { if(res.ok) { location.reload(); } else { alert("Password o credenziali errate!"); } });
         }
         function apriPagamento() { document.getElementById('modalPagamento').style.display = 'flex'; }
         function chiudiPagamento() { document.getElementById('modalPagamento').style.display = 'none'; }
