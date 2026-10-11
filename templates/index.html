@@ -14,7 +14,7 @@
         .header-logo { font-size: 1.4rem; font-weight: 800; background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .header-right { display: flex; align-items: center; gap: 12px; }
         
-        .app-container { display: flex; flex: 1; position: relative; }
+        .app-container { display: flex; flex: 1; position: relative; width: 100%; }
         
         sidebar { width: 260px; background: white; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; padding: 25px 15px; z-index: 10; flex-shrink: 0; }
         .nav-menu { display: flex; flex-direction: column; gap: 8px; }
@@ -107,7 +107,7 @@
         <div class="header-right">
             {% if user_email %}
                 <span style="font-size: 0.9rem; font-weight: 600; color: var(--primary);">👤 {{ user_email }}</span>
-                <a href="/logout-utente" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.8rem;">Esci</a>
+                <a href="/logout-utente" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.80rem;">Esci</a>
             {% else %}
                 <button type="button" class="btn btn-outline" style="padding: 6px 14px; font-size: 0.85rem;" onclick="apriLoginModal('login')">Accedi</button>
                 <button type="button" class="btn" style="padding: 6px 14px; font-size: 0.85rem;" onclick="apriLoginModal('register')">Registrati</button>
@@ -213,4 +213,395 @@
                         </div>
                         <div class="file-upload-wrapper">
                             <label>📷 Carica foto:</label>
-                            <input type="file" id="imageFile" accept="image/*"
+                            <input type="file" id="imageFile" accept="image/*" style="font-size: 0.85rem;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISTA ORDINI -->
+            <div id="vista-ordini" class="view-section">
+                <div class="section-box">
+                    <div class="section-title">📦 I Miei Ordini & Stato Spedizione</div>
+                    <div class="section-desc">Controlla lo stato dei tuoi acquisti tramite il tuo codice ordine e inserisci la spedizione.</div>
+
+                    <div id="ordiniContainer">
+                        {% if not ordini_utente %}
+                            <p style="color: #94a3b8; font-style: italic;" id="noOrdiniText">Nessun ordine registrato al momento.</p>
+                        {% endif %}
+
+                        {% for ord in ordini_utente %}
+                        <div class="ordine-item">
+                            <p style="font-size: 1.1rem; color: #6366f1; font-weight: 800; margin-bottom: 5px;">Ordine {{ ord.codice }}</p>
+                            <p><strong>Articolo:</strong> {{ ord.prodotto }} | <strong>Importo:</strong> €{{ ord.importo }}</p>
+                            
+                            {% if ord.stato == 'In attesa di verifica pagamento' %}
+                                <div><span class="badge badge-attesa">⏳ Pagamento in fase di verifica da parte di un operatore...</span></div>
+                            {% elif ord.stato == 'Pagamento Verificato - Inserisci Spedizione' %}
+                                <div>
+                                    <span class="badge badge-verificato">✅ Pagamento Verificato! Inserisci il tuo indirizzo</span>
+                                    <div style="margin-top: 12px; background: #fff; padding: 15px; border-radius: 10px; border: 1px solid #cbd5e1;">
+                                        <form action="/salva-spedizione/{{ ord.id }}" method="POST" style="display: flex; flex-direction: column; gap: 10px;">
+                                            <input type="text" name="nome" placeholder="Nome e Cognome" required style="padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px;">
+                                            <input type="text" name="indirizzo" placeholder="Indirizzo (Via e Civico)" required style="padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px;">
+                                            <input type="text" name="citta" placeholder="Città e CAP" required style="padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px;">
+                                            <button type="submit" class="btn" style="width: 100%;">Invia Informazioni di Spedizione</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            {% elif ord.stato == 'Annullato' %}
+                                <div>
+                                    <span class="badge badge-annullato">❌ Ordine Annullato</span>
+                                    <p style="font-size: 0.9rem; color: #991b1b; margin-top: 5px; background: #fef2f2; padding: 10px; border-radius: 8px; border: 1px solid #fecaca;">
+                                        <strong>Motivo:</strong> {{ ord.motivo_annullamento }}
+                                    </p>
+                                    <form action="/elimina-ordine-cliente/{{ ord.id }}" method="POST" style="margin-top: 12px;">
+                                        <button type="submit" class="btn btn-danger" style="font-size: 0.8rem; padding: 6px 12px;">🗑️ Elimina Ordine</button>
+                                    </form>
+                                </div>
+                            {% elif ord.stato == 'Arrivato' %}
+                                <div>
+                                    <p style="font-size: 0.85rem; color: #64748b; margin-top:5px;">Spedizione a: {{ ord.nome }}, {{ ord.indirizzo }}, {{ ord.citta }}</p>
+                                    <span class="badge badge-verificato">📌 Stato: Arrivato</span>
+                                    
+                                    <!-- FORM RECENSIONE -->
+                                    <div style="margin-top: 15px; background: #fff; padding: 15px; border-radius: 12px; border: 1px solid #cbd5e1;">
+                                        <h4 style="font-size: 0.95rem; color: var(--primary); margin-bottom: 10px;">⭐ Lascia una recensione per questo ordine:</h4>
+                                        <div class="form-group">
+                                            <label>Valutazione (Stelle):</label>
+                                            <select id="recStelle-{{ ord.id }}">
+                                                <option value="5">⭐⭐⭐⭐⭐ (5/5)</option>
+                                                <option value="4">⭐⭐⭐⭐ (4/5)</option>
+                                                <option value="3">⭐⭐⭐ (3/5)</option>
+                                                <option value="2">⭐⭐ (2/5)</option>
+                                                <option value="1">⭐ (1/5)</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Commento:</label>
+                                            <textarea id="recCommento-{{ ord.id }}" rows="2" placeholder="Scrivi la tua opinione sul capo ricevuto..."></textarea>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>📷 Foto del Prodotto (Opzionale):</label>
+                                            <input type="file" id="recFoto-{{ ord.id }}" accept="image/*">
+                                        </div>
+                                        <button type="button" class="btn" style="width: 100%;" onclick="inviaRecensione('{{ ord.id }}')">Pubblica Recensione</button>
+                                    </div>
+
+                                    <form action="/elimina-ordine-cliente/{{ ord.id }}" method="POST" style="margin-top: 12px;">
+                                        <button type="submit" class="btn btn-danger" style="font-size: 0.8rem; padding: 6px 12px;">🗑️ Elimina Ordine</button>
+                                    </form>
+                                </div>
+                            {% else %}
+                                <div>
+                                    <p style="font-size: 0.85rem; color: #64748b; margin-top:5px;">Spedizione a: {{ ord.nome }}, {{ ord.indirizzo }}, {{ ord.citta }}</p>
+                                    <span class="badge badge-verificato">📌 Stato: {{ ord.stato }}</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+        </main-content>
+    </div>
+
+    <!-- Modale Login / Registrazione -->
+    <div class="modal" id="modalLoginUtente" style="display: {% if auth_error %}flex{% else %}none{% endif %};">
+        <div class="modal-content">
+            <button type="button" class="close-btn" onclick="chiudiLoginModal()">&times;</button>
+            <div class="tab-buttons">
+                <button type="button" class="tab-btn {% if active_tab == 'login' %}active{% endif %}" id="btnTabLogin" onclick="mostraTabAuth('login')">Accedi</button>
+                <button type="button" class="tab-btn {% if active_tab == 'register' %}active{% endif %}" id="btnTabRegister" onclick="mostraTabAuth('register')">Registrati</button>
+            </div>
+            {% if auth_error %}
+                <div class="error-alert">⚠️ {{ auth_error }}</div>
+            {% endif %}
+            <div id="formLogin" style="display: {% if active_tab == 'register' %}none{% else %}block{% endif %};">
+                <form action="/login-utente" method="POST">
+                    <div class="form-group"><label>Email</label><input type="email" name="email" required placeholder="tuaemail@esempio.com"></div>
+                    <div class="form-group"><label>Password</label><input type="password" name="password" required placeholder="La tua password"></div>
+                    <button type="submit" class="btn" style="width: 100%;">Accedi</button>
+                </form>
+                <div class="divider"><span>oppure</span></div>
+                <button type="button" class="btn-google" onclick="loginConGoogle()">Accedi con Google</button>
+            </div>
+            <div id="formRegister" style="display: {% if active_tab == 'register' %}block{% else %}none{% endif %};">
+                <form action="/registra-utente" method="POST">
+                    <div class="form-group"><label>Email</label><input type="email" name="email" required placeholder="tuaemail@esempio.com"></div>
+                    <div class="form-group"><label>Password</label><input type="password" name="password" required placeholder="Crea una password"></div>
+                    <div class="form-group"><label>Conferma Password</label><input type="password" name="password_confirm" required placeholder="Ripeti la password"></div>
+                    <button type="submit" class="btn" style="width: 100%;">Crea Account</button>
+                </form>
+                <div class="divider"><span>oppure</span></div>
+                <button type="button" class="btn-google" onclick="loginConGoogle()">Registrati con Google</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale Pagamento -->
+    <div class="modal" id="modalPagamento" style="display: none;">
+        <div class="modal-content">
+            <button type="button" class="close-btn" onclick="chiudiPagamento()">&times;</button>
+            <h2>Registra Pagamento</h2>
+            {% if not user_email %}
+                <div class="error-alert">
+                    <p><strong>Devi effettuare l'accesso per acquistare!</strong></p>
+                    <button type="button" class="btn" onclick="chiudiPagamento(); apriLoginModal('login');" style="margin-top: 10px;">Accedi Ora</button>
+                </div>
+            {% else %}
+                <p style="margin-bottom: 20px; font-size: 0.9rem; color: #64748b;">Connesso come: <strong>{{ user_email }}</strong></p>
+                <div class="form-group"><label>Articolo Acquistato</label><input type="text" id="pagProdotto" placeholder="Es: LV Skate nere taglia 42" required></div>
+                <div class="form-group"><label>Importo Pagato (€)</label><input type="text" id="pagImporto" placeholder="Es: 150.00" required></div>
+                <h3 style="margin: 20px 0 10px; font-size: 1.1rem; color: var(--primary);">Seleziona Metodo di Pagamento:</h3>
+                <button type="button" class="payment-option" onclick="registraElicaPagamento('PayPal')"><h4>🔵 Paga con PayPal (@MarcoTortoli)</h4><p>Verrai reindirizzato al link ufficiale PayPal protetto.</p></button>
+                <button type="button" class="payment-option" onclick="registraElicaPagamento('Bonifico Bancario Hype')"><h4>🏦 Bonifico Bancario (Hype)</h4><p>Visualizza l'IBAN intestato a Marco Tortoli.</p></button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Modale Bonifico -->
+    <div class="modal" id="modalBonifico" style="display: none;">
+        <div class="modal-content">
+            <button type="button" class="close-btn" onclick="chiudiBonifico()">&times;</button>
+            <h2>Bonifico Bancario Hype</h2>
+            <p style="margin-bottom: 15px; font-size: 0.9rem; color: #64748b;">Effettua il bonifico con i dati sottostanti:</p>
+            <div style="background: #f1f5f9; padding: 15px; border-radius: 12px; margin-bottom: 20px; font-size: 0.95rem; text-align: left;">
+                <p><strong>Banca:</strong> Hype</p>
+                <p><strong>Intestatario:</strong> Marco Tortoli</p>
+                <p><strong>IBAN:</strong> <span style="font-family: monospace; font-weight: bold;">IT63B03268223000EMH02521605</span></p>
+            </div>
+            <button type="button" class="btn" style="width: 100%;" onclick="chiudiBonifico()">Ho completato il pagamento</button>
+        </div>
+    </div>
+
+    <script>
+        function mostraVista(nomeVista, elementoBtn) {
+            document.querySelectorAll('.view-section').forEach(el => {
+                el.classList.remove('active');
+                el.style.display = 'none';
+            });
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            
+            const target = document.getElementById('vista-' + nomeVista);
+            if (target) {
+                target.style.display = 'block';
+                target.classList.add('active');
+                if(nomeVista === 'chat') scrollChatDown();
+            }
+            if(elementoBtn) elementoBtn.classList.add('active');
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            document.querySelectorAll('.view-section').forEach(el => {
+                if(!el.classList.contains('active')) {
+                    el.style.display = 'none';
+                } else {
+                    el.style.display = 'block';
+                }
+            });
+            scrollChatDown();
+            setInterval(aggiornaDatiClienteInTempoReale, 4000);
+        });
+
+        function scrollChatDown() {
+            const chatBox = document.getElementById('chatMessages');
+            if(chatBox) { chatBox.scrollTop = chatBox.scrollHeight; }
+        }
+
+        function inviaRichiesta() {
+            const inputField = document.getElementById('userInput');
+            const testo = inputField.value.trim();
+            const fileInput = document.getElementById('imageFile');
+            
+            if(!testo && fileInput.files.length === 0) { alert("Scrivi un messaggio o seleziona un'immagine."); return; }
+            
+            if (fileInput.files.length > 0) {
+                const reader = new FileReader();
+                reader.onload = function(e) { inviaDatiAlServer(testo, e.target.result); };
+                reader.readAsDataURL(fileInput.files[0]);
+            } else { inviaDatiAlServer(testo, ""); }
+        }
+
+        function inviaDatiAlServer(testo, img) {
+            fetch('/invia', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ testo: testo, immagine: img }) 
+            }).then(res => {
+                if(res.ok) {
+                    document.getElementById('userInput').value = '';
+                    document.getElementById('imageFile').value = '';
+                    aggiornaDatiClienteInTempoReale();
+                }
+            });
+        }
+
+        function inviaRecensione(ordineId) {
+            const stelle = document.getElementById('recStelle-' + ordineId).value;
+            const commento = document.getElementById('recCommento-' + ordineId).value.trim();
+            const fileInput = document.getElementById('recFoto-' + ordineId);
+
+            if(!commento) { alert("Inserisci un breve commento."); return; }
+
+            if(fileInput.files.length > 0) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    inviaRecensioneServer(ordineId, stelle, commento, e.target.result);
+                };
+                reader.readAsDataURL(fileInput.files[0]);
+            } else {
+                inviaRecensioneServer(ordineId, stelle, commento, "");
+            }
+        }
+
+        function inviaRecensioneServer(ordineId, stelle, commento, img) {
+            fetch('/invia-recensione/' + ordineId, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stelle: stelle, commento: commento, immagine: img })
+            }).then(res => {
+                if(res.ok) {
+                    alert("Recensione pubblicata con successo!");
+                    location.reload();
+                } else {
+                    alert("Errore nell'invio della recensione.");
+                }
+            });
+        }
+
+        function aggiornaDatiClienteInTempoReale() {
+            const activeElem = document.activeElement;
+            if (activeElem && (activeElem.tagName === 'INPUT' || activeElem.tagName === 'TEXTAREA' || activeElem.tagName === 'SELECT')) {
+                return;
+            }
+
+            fetch('/api/chat-utente')
+            .then(res => res.json())
+            .then(data => {
+                const chatBox = document.getElementById('chatMessages');
+                if(!chatBox) return;
+                let html = '<div class="message-bubble system">Benvenuto su MyClothes! Chiedi un articolo e concorda i dettagli.</div>';
+                data.forEach(r => {
+                    let mittenteLabel = r.mittente === 'admin' ? '<strong style="display:block; font-size:0.75rem; color:#065f46; margin-bottom:2px;">MyClothes (Venditore)</strong>' : '<strong style="display:block; font-size:0.75rem; color:#3730a3; margin-bottom:2px;">Tu</strong>';
+                    let imgTag = r.immagine ? `<br><img src="${r.immagine}" alt="Foto allegata">` : '';
+                    html += `<div class="message-bubble ${r.mittente}">${mittenteLabel}${r.testo}${imgTag}</div>`;
+                });
+                const eraInFondo = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 50;
+                chatBox.innerHTML = html;
+                if(eraInFondo) { scrollChatDown(); }
+            });
+
+            fetch('/api/ordini-utente')
+            .then(res => res.json())
+            .then(ordini => {
+                const container = document.getElementById('ordiniContainer');
+                if(!container) return;
+                if(ordini.length === 0) {
+                    container.innerHTML = '<p style="color: #94a3b8; font-style: italic;" id="noOrdiniText">Nessun ordine registrato al momento.</p>';
+                    return;
+                }
+                let html = '';
+                ordini.forEach(ord => {
+                    html += `<div class="ordine-item">
+                        <p style="font-size: 1.1rem; color: #6366f1; font-weight: 800; margin-bottom: 5px;">Ordine ${ord.codice}</p>
+                        <p><strong>Articolo:</strong> ${ord.prodotto} | <strong>Importo:</strong> €${ord.importo}</p>`;
+                    
+                    if(ord.stato === 'In attesa di verifica pagamento') {
+                        html += `<div><span class="badge badge-attesa">⏳ Pagamento in fase di verifica da parte di un operatore...</span></div>`;
+                    } else if(ord.stato === 'Pagamento Verificato - Inserisci Spedizione') {
+                        html += `<div><span class="badge badge-verificato">✅ Pagamento Verificato! Inserisci il tuo indirizzo</span>
+                            <div style="margin-top: 12px; background: #fff; padding: 15px; border-radius: 10px; border: 1px solid #cbd5e1;">
+                                <form action="/salva-spedizione/${ord.id}" method="POST" style="display: flex; flex-direction: column; gap: 10px;">
+                                    <input type="text" name="nome" placeholder="Nome e Cognome" required style="padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px;">
+                                    <input type="text" name="indirizzo" placeholder="Indirizzo (Via e Civico)" required style="padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px;">
+                                    <input type="text" name="citta" placeholder="Città e CAP" required style="padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px;">
+                                    <button type="submit" class="btn" style="width: 100%;">Invia Informazioni di Spedizione</button>
+                                </form>
+                            </div></div>`;
+                    } else if(ord.stato === 'Annullato') {
+                        html += `<div><span class="badge badge-annullato">❌ Ordine Annullato</span>
+                            <p style="font-size: 0.9rem; color: #991b1b; margin-top: 5px; background: #fef2f2; padding: 10px; border-radius: 8px; border: 1px solid #fecaca;"><strong>Motivo:</strong> ${ord.motivo_annullamento}</p>
+                            <form action="/elimina-ordine-cliente/${ord.id}" method="POST" style="margin-top: 12px;"><button type="submit" class="btn btn-danger" style="font-size: 0.8rem; padding: 6px 12px;">🗑️ Elimina Ordine</button></form></div>`;
+                    } else if(ord.stato === 'Arrivato') {
+                        html += `<div><p style="font-size: 0.85rem; color: #64748b; margin-top:5px;">Spedizione a: ${ord.nome}, ${ord.indirizzo}, ${ord.citta}</p>
+                            <span class="badge badge-verificato">📌 Stato: Arrivato</span>
+                            
+                            <div style="margin-top: 15px; background: #fff; padding: 15px; border-radius: 12px; border: 1px solid #cbd5e1;">
+                                <h4 style="font-size: 0.95rem; color: var(--primary); margin-bottom: 10px;">⭐ Lascia una recensione per questo ordine:</h4>
+                                <div class="form-group"><label>Valutazione (Stelle):</label>
+                                    <select id="recStelle-${ord.id}">
+                                        <option value="5">⭐⭐⭐⭐⭐ (5/5)</option>
+                                        <option value="4">⭐⭐⭐⭐ (4/5)</option>
+                                        <option value="3">⭐⭐⭐ (3/5)</option>
+                                        <option value="2">⭐⭐ (2/5)</option>
+                                        <option value="1">⭐ (1/5)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group"><label>Commento:</label><textarea id="recCommento-${ord.id}" rows="2" placeholder="Scrivi la tua opinione sul capo ricevuto..."></textarea></div>
+                                <div class="form-group"><label>📷 Foto del Prodotto (Opzionale):</label><input type="file" id="recFoto-${ord.id}" accept="image/*"></div>
+                                <button type="button" class="btn" style="width: 100%;" onclick="inviaRecensione('${ord.id}')">Pubblica Recensione</button>
+                            </div>
+
+                            <form action="/elimina-ordine-cliente/${ord.id}" method="POST" style="margin-top: 12px;"><button type="submit" class="btn btn-danger" style="font-size: 0.8rem; padding: 6px 12px;">🗑️ Elimina Ordine</button></form></div>`;
+                    } else {
+                        html += `<div><p style="font-size: 0.85rem; color: #64748b; margin-top:5px;">Spedizione a: ${ord.nome}, ${ord.indirizzo}, ${ord.citta}</p>
+                            <span class="badge badge-verificato">📌 Stato: ${ord.stato}</span></div>`;
+                    }
+                    html += `</div>`;
+                });
+                container.innerHTML = html;
+            });
+        }
+
+        function apriLoginModal(tab) {
+            mostraTabAuth(tab);
+            document.getElementById('modalLoginUtente').style.display = 'flex';
+        }
+        function chiudiLoginModal() { document.getElementById('modalLoginUtente').style.display = 'none'; }
+        function mostraTabAuth(tab) {
+            if(tab === 'login') {
+                document.getElementById('formLogin').style.display = 'block';
+                document.getElementById('formRegister').style.display = 'none';
+                document.getElementById('btnTabLogin').classList.add('active');
+                document.getElementById('btnTabRegister').classList.remove('active');
+            } else {
+                document.getElementById('formLogin').style.display = 'none';
+                document.getElementById('formRegister').style.display = 'block';
+                document.getElementById('btnTabLogin').classList.remove('active');
+                document.getElementById('btnTabRegister').classList.add('active');
+            }
+        }
+        function loginConGoogle() {
+            let emailGoogle = prompt("Inserisci la tua email Google per accedere:");
+            if(!emailGoogle || !emailGoogle.includes('@')) { alert("Email non valida."); return; }
+            let passGoogle = prompt("Inserisci la tua password di accesso:");
+            if(!passGoogle) { alert("La password è obbligatoria per accedere."); return; }
+
+            fetch('/login-google', {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: emailGoogle.trim().toLowerCase(), password: passGoogle.trim() })
+            }).then(res => { if(res.ok) { location.reload(); } else { alert("Password o credenziali errate!"); } });
+        }
+        function apriPagamento() { document.getElementById('modalPagamento').style.display = 'flex'; }
+        function chiudiPagamento() { document.getElementById('modalPagamento').style.display = 'none'; }
+        function chiudiBonifico() { document.getElementById('modalBonifico').style.display = 'none'; location.reload(); }
+        function registraElicaPagamento(metodo) {
+            const prodotto = document.getElementById('pagProdotto').value.trim();
+            const importo = document.getElementById('pagImporto').value.trim();
+            if(!prodotto || !importo) { alert("Compila tutti i campi prima di procedere."); return; }
+            fetch('/registra-pagamento', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prodotto: prodotto, importo: importo, metodo: metodo })
+            }).then(() => {
+                chiudiPagamento();
+                aggiornaDatiClienteInTempoReale();
+                if(metodo === 'PayPal') { window.open("https://paypal.me/MarcoTortoli", "_blank"); }
+                else { document.getElementById('modalBonifico').style.display = 'flex'; }
+            });
+        }
+    </script>
+</body>
+</html>
