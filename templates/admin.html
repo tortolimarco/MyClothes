@@ -34,7 +34,7 @@
         .chat-contact-title { font-weight: 700; font-size: 0.9rem; color: #0f172a; word-break: break-all; }
         .chat-contact-sub { font-size: 0.8rem; color: #64748b; margin-top: 3px; }
         
-        .chat-main-area { flex: 1; display: flex; flex-direction: column; background: #efeae2; }
+        .chat-main-area { flex: 1; display: flex; flex-direction: column; background: #efeae2; position: relative; }
         .chat-messages-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
         .wa-bubble { padding: 10px 14px; border-radius: 12px; max-width: 70%; font-size: 0.9rem; position: relative; word-break: break-word; }
         .wa-bubble.cliente { background: white; color: #111; align-self: flex-start; border-top-left-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
@@ -158,7 +158,7 @@
                         {% for user_id, messaggi in chat_per_utente.items() %}
                             <div class="chat-contact" id="contact-{{ user_id }}" onclick="selezionaChat('{{ user_id }}')">
                                 <div class="chat-contact-title">👤 {{ email_per_uid.get(user_id, 'Cliente Anonimo') }}</div>
-                                <div class="chat-contact-sub">ID: {{ user_id[:8] }}... ({{ messaggi|length }} msg)</div>
+                                <div class="chat-contact-sub">ID: {{ user_id[:8] }}...</div>
                             </div>
                         {% endfor %}
                     </div>
@@ -169,31 +169,16 @@
                             Seleziona una chat dalla lista a sinistra
                         </div>
 
-                        {% for user_id, messaggi in chat_per_utente.items() %}
-                            <div id="chat-pane-{{ user_id }}" class="chat-pane" style="display: none; height: 100%; display: flex; flex-direction: column;">
-                                <div class="chat-messages-box">
-                                    {% for m in messaggi %}
-                                        <div class="wa-bubble {{ m.mittente }}">
-                                            {% if m.mittente == 'admin' %}
-                                                <strong style="display:block; font-size:0.75rem; color:#059669; margin-bottom:2px;">Tu (Admin)</strong>
-                                            {% else %}
-                                                <strong style="display:block; font-size:0.75rem; color:#6366f1; margin-bottom:2px;">Cliente</strong>
-                                            {% endif %}
-                                            
-                                            {{ m.testo }}
-                                            {% if m.immagine %}
-                                                <br><img src="{{ m.immagine }}" alt="Foto allegata">
-                                            {% endif %}
-                                        </div>
-                                    {% endfor %}
-                                </div>
-
-                                <form action="/rispondi-chat/{{ user_id }}" method="POST" class="chat-input-bar">
-                                    <input type="text" name="risposta" placeholder="Scrivi un messaggio..." required autocomplete="off">
-                                    <button type="submit" class="btn" style="background:#00a884;">Invia</button>
-                                </form>
+                        <div id="active-chat-pane" style="display: none; height: 100%; display: flex; flex-direction: column;">
+                            <div class="chat-messages-box" id="adminChatMessages">
+                                <!-- I messaggi verranno iniettati via JS -->
                             </div>
-                        {% endfor %}
+
+                            <div class="chat-input-bar">
+                                <input type="text" id="adminInputRisposta" placeholder="Scrivi un messaggio..." autocomplete="off" onkeypress="handleAdminKeypress(event)">
+                                <button type="button" class="btn" style="background:#00a884;" onclick="inviaRispostaAdmin()">Invia</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             {% endif %}
@@ -201,6 +186,9 @@
     </div>
 
     <script>
+        let currentSelectedUserId = null;
+        let chatInterval = null;
+
         function mostraSezioneAdmin(idSezione, btnElement) {
             document.querySelectorAll('.admin-section').forEach(sec => sec.classList.remove('active'));
             document.querySelectorAll('.admin-nav-btn').forEach(btn => btn.classList.remove('active'));
@@ -209,30 +197,67 @@
         }
 
         function selezionaChat(userId) {
-            // Nascondi tutte le chat e il box iniziale
-            document.getElementById('no-chat-box').style.display = 'none';
-            document.querySelectorAll('.chat-pane').forEach(pane => pane.style.display = 'none');
-            document.querySelectorAll('.chat-contact').forEach(c => c.classList.remove('active'));
-
-            // Mostra la chat selezionata
-            const targetPane = document.getElementById('chat-pane-' + userId);
-            if (targetPane) {
-                targetPane.style.display = 'flex';
-                // Imposta flex-direction column per mantenere la struttura
-                targetPane.style.flexDirection = 'column';
-                targetPane.style.flex = '1';
-            }
+            currentSelectedUserId = userId;
             
+            document.getElementById('no-chat-box').style.display = 'none';
+            document.getElementById('active-chat-pane').style.display = 'flex';
+            
+            document.querySelectorAll('.chat-contact').forEach(c => c.classList.remove('active'));
             const contactCard = document.getElementById('contact-' + userId);
-            if (contactCard) {
-                contactCard.classList.add('active');
-            }
+            if (contactCard) contactCard.classList.add('active');
 
-            // Scroll in fondo alla chat
-            const msgBox = targetPane ? targetPane.querySelector('.chat-messages-box') : null;
-            if (msgBox) {
-                msgBox.scrollTop = msgBox.scrollHeight;
+            // Carica immediatamente la chat e avvia il timer di aggiornamento automatico
+            caricaMessaggiAdmin();
+            if(chatInterval) clearInterval(chatInterval);
+            chatInterval = setInterval(caricaMessaggiAdmin, 3000);
+        }
+
+        function caricaMessaggiAdmin() {
+            if(!currentSelectedUserId) return;
+
+            fetch('/api/admin/chat/' + currentSelectedUserId)
+            .then(res => res.json())
+            .then(data => {
+                const msgBox = document.getElementById('adminChatMessages');
+                if(!msgBox) return;
+
+                let html = '';
+                data.forEach(m => {
+                    let mittenteLabel = m.mittente === 'admin' ? '<strong style="display:block; font-size:0.75rem; color:#059669; margin-bottom:2px;">Tu (Admin)</strong>' : '<strong style="display:block; font-size:0.75rem; color:#6366f1; margin-bottom:2px;">Cliente</strong>';
+                    let imgTag = m.immagine ? `<br><img src="${m.immagine}" alt="Foto">` : '';
+                    html += `<div class="wa-bubble ${m.mittente}">${mittenteLabel}${m.testo}${imgTag}</div>`;
+                });
+
+                const eraInFondo = msgBox.scrollHeight - msgBox.scrollTop <= msgBox.clientHeight + 50;
+                msgBox.innerHTML = html;
+                if(eraInFondo) {
+                    msgBox.scrollTop = msgBox.scrollHeight;
+                }
+            });
+        }
+
+        function handleAdminKeypress(e) {
+            if (e.key === 'Enter') {
+                inviaRispostaAdmin();
             }
+        }
+
+        function inviaRispostaAdmin() {
+            if(!currentSelectedUserId) return;
+            const inputField = document.getElementById('adminInputRisposta');
+            const testo = inputField.value.trim();
+            if(!testo) return;
+
+            fetch('/api/admin/rispondi/' + currentSelectedUserId, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ risposta: testo })
+            }).then(res => {
+                if(res.ok) {
+                    inputField.value = '';
+                    caricaMessaggiAdmin();
+                }
+            });
         }
     </script>
 </body>
