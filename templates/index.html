@@ -8,17 +8,17 @@
     <style>
         :root { --primary: #0f172a; --accent: #6366f1; --accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); --bg: #f8fafc; --card-bg: #ffffff; --text: #334155; }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
-        body { background-color: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
+        body { background-color: var(--bg); color: var(--text); display: flex; min-height: 100vh; overflow-x: hidden; }
         
         sidebar { width: 280px; background: white; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; justify-content: space-between; padding: 30px 20px; z-index: 10; flex-shrink: 0; }
         .sidebar-top .logo { font-size: 1.4rem; font-weight: 800; background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 25px; }
         .nav-menu { display: flex; flex-direction: column; gap: 8px; }
-        .nav-item { padding: 12px 16px; border-radius: 12px; font-weight: 600; font-size: 0.95rem; color: #64748b; background: transparent; border: none; text-align: left; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 12px; }
+        .nav-item { padding: 12px 16px; border-radius: 12px; font-weight: 600; font-size: 0.95rem; color: #64748b; background: transparent; border: none; text-align: left; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 12px; width: 100%; }
         .nav-item:hover, .nav-item.active { background: #e0e7ff; color: #3730a3; }
         
         .user-box { background: #f1f5f9; padding: 15px; border-radius: 14px; text-align: center; font-size: 0.9rem; margin-top: 15px; }
         
-        main-content { flex: 1; padding: 40px; overflow-y: auto; background: var(--bg); position: relative; }
+        main-content { flex: 1; padding: 40px; background: var(--bg); position: relative; min-height: 100vh; overflow-y: auto; }
         .view-section { display: none; }
         .view-section.active { display: block; }
         
@@ -84,9 +84,7 @@
             .sidebar-top .logo { margin-bottom: 15px; text-align: center; }
             .nav-menu { flex-direction: row; flex-wrap: wrap; gap: 6px; justify-content: center; }
             .nav-item { flex: 1; min-width: 130px; justify-content: center; font-size: 0.85rem; padding: 10px; text-align: center; }
-            main-content { padding: 20px; height: auto; overflow: visible; }
-            .hero h1 { font-size: 1.6rem; }
-            .hero p { font-size: 0.9rem; }
+            main-content { padding: 20px; height: auto; overflow: visible; min-height: unset; }
             .sidebar-bottom { margin-top: 15px; }
         }
     </style>
@@ -97,10 +95,10 @@
         <div class="sidebar-top">
             <div class="logo">⚡ MyClothes</div>
             <div class="nav-menu">
-                <button class="nav-item active" onclick="mostraVista('home', this)">🏠 Vetrina</button>
-                <button class="nav-item" onclick="mostraVista('chat', this)">💬 Chat</button>
-                <button class="nav-item" onclick="mostraVista('ordini', this)">📦 Ordini</button>
-                <button class="nav-item" onclick="apriPagamento()">💳 Paga</button>
+                <button type="button" class="nav-item active" onclick="mostraVista('home', this)">🏠 Vetrina</button>
+                <button type="button" class="nav-item" onclick="mostraVista('chat', this)">💬 Chat</button>
+                <button type="button" class="nav-item" onclick="mostraVista('ordini', this)">📦 Ordini</button>
+                <button type="button" class="nav-item" onclick="apriPagamento()">💳 Paga</button>
             </div>
         </div>
 
@@ -112,12 +110,12 @@
                 {% else %}
                     <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 8px;">Non sei loggato</p>
                     <div style="display: flex; gap: 6px;">
-                        <button class="btn btn-outline" style="flex:1; padding: 6px; font-size: 0.75rem;" onclick="apriLoginModal('login')">Accedi</button>
-                        <button class="btn" style="flex:1; padding: 6px; font-size: 0.75rem;" onclick="apriLoginModal('register')">Registrati</button>
+                        <button type="button" class="btn btn-outline" style="flex:1; padding: 6px; font-size: 0.75rem;" onclick="apriLoginModal('login')">Accedi</button>
+                        <button type="button" class="btn" style="flex:1; padding: 6px; font-size: 0.75rem;" onclick="apriLoginModal('register')">Registrati</button>
                     </div>
                 {% endif %}
             </div>
-            <a href="/admin" class="btn btn-outline" style="text-align: center; font-size: 0.85rem; padding: 8px;">🔒 Area Admin</a>
+            <a href="/admin" class="btn btn-outline" style="text-align: center; font-size: 0.85rem; padding: 8px; display: block; text-decoration: none;">🔒 Area Admin</a>
         </div>
     </sidebar>
 
@@ -176,7 +174,7 @@
                 <div class="chat-form">
                     <div class="chat-input-row">
                         <input type="text" id="userInput" placeholder="Scrivi il capo desiderato...">
-                        <button class="btn" onclick="inviaRichiesta()">Invia</button>
+                        <button type="button" class="btn" onclick="inviaRichiesta()">Invia</button>
                     </div>
                     <div class="file-upload-wrapper">
                         <label>📷 Carica foto:</label>
@@ -251,10 +249,10 @@
     <!-- Modale Login / Registrazione -->
     <div class="modal" id="modalLoginUtente" style="display: {% if auth_error %}flex{% else %}none{% endif %};">
         <div class="modal-content">
-            <button class="close-btn" onclick="chiudiLoginModal()">&times;</button>
+            <button type="button" class="close-btn" onclick="chiudiLoginModal()">&times;</button>
             <div class="tab-buttons">
-                <button class="tab-btn {% if active_tab == 'login' %}active{% endif %}" id="btnTabLogin" onclick="mostraTabAuth('login')">Accedi</button>
-                <button class="tab-btn {% if active_tab == 'register' %}active{% endif %}" id="btnTabRegister" onclick="mostraTabAuth('register')">Registrati</button>
+                <button type="button" class="tab-btn {% if active_tab == 'login' %}active{% endif %}" id="btnTabLogin" onclick="mostraTabAuth('login')">Accedi</button>
+                <button type="button" class="tab-btn {% if active_tab == 'register' %}active{% endif %}" id="btnTabRegister" onclick="mostraTabAuth('register')">Registrati</button>
             </div>
             {% if auth_error %}
                 <div class="error-alert">⚠️ {{ auth_error }}</div>
@@ -266,7 +264,7 @@
                     <button type="submit" class="btn" style="width: 100%;">Accedi</button>
                 </form>
                 <div class="divider"><span>oppure</span></div>
-                <button class="btn-google" type="button" onclick="loginConGoogle()">Accedi con Google</button>
+                <button type="button" class="btn-google" onclick="loginConGoogle()">Accedi con Google</button>
             </div>
             <div id="formRegister" style="display: {% if active_tab == 'register' %}block{% else %}none{% endif %};">
                 <form action="/registra-utente" method="POST">
@@ -276,7 +274,7 @@
                     <button type="submit" class="btn" style="width: 100%;">Crea Account</button>
                 </form>
                 <div class="divider"><span>oppure</span></div>
-                <button class="btn-google" type="button" onclick="loginConGoogle()">Registrati con Google</button>
+                <button type="button" class="btn-google" onclick="loginConGoogle()">Registrati con Google</button>
             </div>
         </div>
     </div>
@@ -284,20 +282,20 @@
     <!-- Modale Pagamento -->
     <div class="modal" id="modalPagamento" style="display: none;">
         <div class="modal-content">
-            <button class="close-btn" onclick="chiudiPagamento()">&times;</button>
+            <button type="button" class="close-btn" onclick="chiudiPagamento()">&times;</button>
             <h2>Registra Pagamento</h2>
             {% if not user_email %}
                 <div class="error-alert">
                     <p><strong>Devi effettuare l'accesso per acquistare!</strong></p>
-                    <button class="btn" onclick="chiudiPagamento(); apriLoginModal('login');" style="margin-top: 10px;">Accedi Ora</button>
+                    <button type="button" class="btn" onclick="chiudiPagamento(); apriLoginModal('login');" style="margin-top: 10px;">Accedi Ora</button>
                 </div>
             {% else %}
                 <p style="margin-bottom: 20px; font-size: 0.9rem; color: #64748b;">Connesso come: <strong>{{ user_email }}</strong></p>
                 <div class="form-group"><label>Articolo Acquistato</label><input type="text" id="pagProdotto" placeholder="Es: LV Skate nere taglia 42" required></div>
                 <div class="form-group"><label>Importo Pagato (€)</label><input type="text" id="pagImporto" placeholder="Es: 150.00" required></div>
                 <h3 style="margin: 20px 0 10px; font-size: 1.1rem; color: var(--primary);">Seleziona Metodo di Pagamento:</h3>
-                <button class="payment-option" onclick="registraElicaPagamento('PayPal')"><h4>🔵 Paga con PayPal (@MarcoTortoli)</h4><p>Verrai reindirizzato al link ufficiale PayPal protetto.</p></button>
-                <button class="payment-option" onclick="registraElicaPagamento('Bonifico Bancario Hype')"><h4>🏦 Bonifico Bancario (Hype)</h4><p>Visualizza l'IBAN intestato a Marco Tortoli.</p></button>
+                <button type="button" class="payment-option" onclick="registraElicaPagamento('PayPal')"><h4>🔵 Paga con PayPal (@MarcoTortoli)</h4><p>Verrai reindirizzato al link ufficiale PayPal protetto.</p></button>
+                <button type="button" class="payment-option" onclick="registraElicaPagamento('Bonifico Bancario Hype')"><h4>🏦 Bonifico Bancario (Hype)</h4><p>Visualizza l'IBAN intestato a Marco Tortoli.</p></button>
             {% endif %}
         </div>
     </div>
@@ -305,6 +303,119 @@
     <!-- Modale Bonifico -->
     <div class="modal" id="modalBonifico" style="display: none;">
         <div class="modal-content">
-            <button class="close-btn" onclick="chiudiBonifico()">&times;</button>
+            <button type="button" class="close-btn" onclick="chiudiBonifico()">&times;</button>
             <h2>Bonifico Bancario Hype</h2>
-            <p style="margin-bottom: 15px
+            <p style="margin-bottom: 15px; font-size: 0.9rem; color: #64748b;">Effettua il bonifico con i dati sottostanti:</p>
+            <div style="background: #f1f5f9; padding: 15px; border-radius: 12px; margin-bottom: 20px; font-size: 0.95rem; text-align: left;">
+                <p><strong>Banca:</strong> Hype</p>
+                <p><strong>Intestatario:</strong> Marco Tortoli</p>
+                <p><strong>IBAN:</strong> <span style="font-family: monospace; font-weight: bold;">IT63B03268223000EMH02521605</span></p>
+            </div>
+            <button type="button" class="btn" style="width: 100%;" onclick="chiudiBonifico()">Ho completato il pagamento</button>
+        </div>
+    </div>
+
+    <script>
+        function mostraVista(nomeVista, elementoBtn) {
+            document.querySelectorAll('.view-section').forEach(el => {
+                el.classList.remove('active');
+                el.style.display = 'none';
+            });
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            
+            const target = document.getElementById('vista-' + nomeVista);
+            if (target) {
+                target.style.display = 'block';
+                target.classList.add('active');
+            }
+            if(elementoBtn) elementoBtn.classList.add('active');
+        }
+
+        // Inizializzazione corretta all'avvio
+        document.addEventListener("DOMContentLoaded", function() {
+            document.querySelectorAll('.view-section').forEach(el => {
+                if(!el.classList.contains('active')) {
+                    el.style.display = 'none';
+                } else {
+                    el.style.display = 'block';
+                }
+            });
+        });
+
+        function inviaRichiesta() {
+            const testo = document.getElementById('userInput').value.trim();
+            const fileInput = document.getElementById('imageFile');
+            if(!testo && fileInput.files.length === 0) { alert("Scrivi un messaggio o seleziona un'immagine."); return; }
+            if (fileInput.files.length > 0) {
+                const reader = new FileReader();
+                reader.onload = function(e) { inviaDatiAlServer(testo, e.target.result); };
+                reader.readAsDataURL(fileInput.files[0]);
+            } else { inviaDatiAlServer(testo, ""); }
+        }
+        function inviaDatiAlServer(testo, img) {
+            fetch('/invia', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testo: testo, immagine: img }) }).then(() => { location.reload(); });
+        }
+        function apriLoginModal(tab) {
+            mostraTabAuth(tab);
+            document.getElementById('modalLoginUtente').style.display = 'flex';
+        }
+        function chiudiLoginModal() { document.getElementById('modalLoginUtente').style.display = 'none'; }
+        function mostraTabAuth(tab) {
+            if(tab === 'login') {
+                document.getElementById('formLogin').style.display = 'block';
+                document.getElementById('formRegister').style.display = 'none';
+                document.getElementById('btnTabLogin').classList.add('active');
+                document.getElementById('btnTabRegister').classList.remove('active');
+            } else {
+                document.getElementById('formLogin').style.display = 'none';
+                document.getElementById('formRegister').style.display = 'block';
+                document.getElementById('btnTabLogin').classList.remove('active');
+                document.getElementById('btnTabRegister').classList.add('active');
+            }
+        }
+        function loginConGoogle() {
+            let emailGoogle = prompt("Inserisci la tua email Google per accedere:");
+            if(!emailGoogle || !emailGoogle.includes('@')) { 
+                alert("Email non valida."); 
+                return; 
+            }
+            let passGoogle = prompt("Inserisci la tua password di accesso:");
+            if(!passGoogle) { 
+                alert("La password è obbligatoria per accedere."); 
+                return; 
+            }
+
+            fetch('/login-google', {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    email: emailGoogle.trim().toLowerCase(), 
+                    password: passGoogle.trim() 
+                })
+            }).then(res => { 
+                if(res.ok) { 
+                    location.reload(); 
+                } else {
+                    alert("Password o credenziali errate!");
+                }
+            });
+        }
+        function apriPagamento() { document.getElementById('modalPagamento').style.display = 'flex'; }
+        function chiudiPagamento() { document.getElementById('modalPagamento').style.display = 'none'; }
+        function chiudiBonifico() { document.getElementById('modalBonifico').style.display = 'none'; location.reload(); }
+        function registraElicaPagamento(metodo) {
+            const prodotto = document.getElementById('pagProdotto').value.trim();
+            const importo = document.getElementById('pagImporto').value.trim();
+            if(!prodotto || !importo) { alert("Compila tutti i campi prima di procedere."); return; }
+            fetch('/registra-pagamento', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prodotto: prodotto, importo: importo, metodo: metodo })
+            }).then(() => {
+                chiudiPagamento();
+                if(metodo === 'PayPal') { window.open("https://paypal.me/MarcoTortoli", "_blank"); location.reload(); }
+                else { document.getElementById('modalBonifico').style.display = 'flex'; }
+            });
+        }
+    </script>
+</body>
+</html>
