@@ -13,13 +13,22 @@ def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
-    # Tabella Utenti
+    # Tabella Utenti Registrati
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS utenti (
             email TEXT PRIMARY KEY,
             password TEXT NOT NULL,
             user_id TEXT NOT NULL,
             data_creazione TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    # Tabella Visitatori / Accessi al sito
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS visitatori (
+            user_id TEXT PRIMARY KEY,
+            user_agent TEXT,
+            ip_address TEXT,
+            ultimo_accesso TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     # Tabella Chat
@@ -91,11 +100,33 @@ def get_user_id():
         row = cursor.fetchone()
         conn.close()
         if row:
-            return row[0]
+            uid = row[0]
+            registra_visitatore(uid)
+            return uid
             
     if 'user_id' not in session:
         session['user_id'] = str(uuid.uuid4())
-    return session['user_id']
+        
+    uid = session['user_id']
+    registra_visitatore(uid)
+    return uid
+
+def registra_visitatore(uid):
+    user_agent = request.headers.get('User-Agent', 'Dispositivo sconosciuto')
+    ip_address = request.remote_addr or 'IP non disponibile'
+    
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO visitatori (user_id, user_agent, ip_address, ultimo_accesso)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(user_id) DO UPDATE SET 
+        ultimo_accesso = CURRENT_TIMESTAMP,
+        user_agent = excluded.user_agent,
+        ip_address = excluded.ip_address
+    ''', (uid, user_agent, ip_address))
+    conn.commit()
+    conn.close()
 
 @app.route('/')
 def home():
@@ -108,12 +139,10 @@ def home():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
-    # Prendi chat utente
     cursor.execute('SELECT mittente, testo, immagine FROM chat WHERE user_id = ?', (uid,))
     chat_rows = cursor.fetchall()
     chat_utente = [{"mittente": r[0], "testo": r[1], "immagine": r[2]} for r in chat_rows]
     
-    # Prendi ordini utente
     cursor.execute('SELECT id, codice, prodotto, importo, metodo, stato, motivo_annullamento, nome, indirizzo, citta FROM ordini WHERE user_id = ?', (uid,))
     ord_rows = cursor.fetchall()
     ordini_utente = [{
@@ -122,7 +151,6 @@ def home():
         "nome": r[7], "indirizzo": r[8], "citta": r[9]
     } for r in ord_rows]
 
-    # Prendi tutte le recensioni per la homepage
     cursor.execute('SELECT codice_ordine, email, prodotto, stelle, commento, immagine FROM recensioni ORDER BY id DESC')
     rec_rows = cursor.fetchall()
     tutte_recensioni = [{
@@ -195,7 +223,7 @@ def registra_utente():
         session['active_tab'] = 'register'
         return redirect(url_for('home'))
         
-    user_id = str(uuid.uuid4())
+    user_id = session.get('user_id', str(uuid.uuid4()))
     cursor.execute('INSERT INTO utenti (email, password, user_id) VALUES (?, ?, ?)', (email, password, user_id))
     conn.commit()
     conn.close()
@@ -224,7 +252,7 @@ def login_google():
             return jsonify({"status": "error", "message": "Password errata per questo account!"}), 401
         user_id = row[1]
     else:
-        user_id = str(uuid.uuid4())
+        user_id = session.get('user_id', str(uuid.uuid4()))
         cursor.execute('INSERT INTO utenti (email, password, user_id) VALUES (?, ?, ?)', (email, password, user_id))
         conn.commit()
         
@@ -457,7 +485,6 @@ def api_admin_dati():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
-    # Prendi tutti gli Ordini
     cursor.execute('SELECT id, codice, user_id, email, prodotto, importo, metodo, stato, motivo_annullamento, nome, indirizzo, citta FROM ordini')
     rows = cursor.fetchall()
     
@@ -475,7 +502,6 @@ def api_admin_dati():
         else:
             tutti_ordini.append(ord_obj)
             
-    # Prendi tutte le Chat
     cursor.execute('SELECT user_id, mittente, testo, immagine FROM chat')
     chat_rows = cursor.fetchall()
     chat_per_utente = {}
@@ -485,13 +511,30 @@ def api_admin_dati():
             chat_per_utente[u_id] = []
         chat_per_utente[u_id].append({"mittente": cr[1], "testo": cr[2], "immagine": cr[3]})
         
-    # Prendi tutti gli Utenti Registrati
-    cursor.execute('SELECT email, password, user_id FROM utenti')
+    cursor.execute('SELECT email, password, user_id, data_creazione FROM utenti')
     user_rows = cursor.fetchall()
-    lista_utenti = [{"email": ur[0], "password": ur[1], "user_id": ur[2]} for ur in user_rows]
+    lista_utenti = [{"email": ur[0], "password": ur[1], "user_id": ur[2], "data": ur[3]} for ur in user_rows]
     email_per_uid = {ur[2]: ur[0] for ur in user_rows}
 
-    # Prendi tutte le Recensioni
+    # Prendi tutti i visitatori/accessi non registrati o totali
+    cursor.execute('SELECT user_id, user_agent, ip_address, ultimo_accesso FROM visitatori ORDER BY ultimo_accesso DESC')
+    visitatori_rows = cursor.fetchall()
+    
+    # Mappa degli user_id registrati per riconoscerli
+    registered_uids = {ur[2] for ur in user_rows}
+    
+    visitatori_non_registrati = []
+    for vr in visitatori_rows:
+        v_uid = vr[0]
+        # Se non è un utente registrato con email, lo mettiamo tra i visitatori liberi/esterni
+        if v_uid not in registered_uids:
+            visitatori_non_registrati.append({
+                "user_id": v_uid,
+                "user_agent": vr[1],
+                "ip": vr[2],
+                "ultimo_accesso": vr[3]
+            })
+
     cursor.execute('SELECT id, ordine_id, codice_ordine, email, prodotto, stelle, commento, immagine FROM recensioni ORDER BY id DESC')
     rec_rows = cursor.fetchall()
     lista_recensioni = [{
@@ -506,6 +549,7 @@ def api_admin_dati():
         "archivio_ordini": archivio_ordini,
         "chat_per_utente": chat_per_utente,
         "lista_utenti": lista_utenti,
+        "visitatori_non_registrati": visitatori_non_registrati,
         "lista_recensioni": lista_recensioni,
         "email_per_uid": email_per_uid
     })
