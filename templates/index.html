@@ -147,7 +147,7 @@
                     <div class="step-card">
                         <div class="step-number">03</div>
                         <h3>Registra il Pagamento</h3>
-                        <p>Usa il tasto <strong>Paga</strong> per pagare in sicurezza tramite PayPal o Bonifico Hype inserendo articolo e importo.</p>
+                        <p>Usa il tasto <strong>Paga</strong> per pagare in sicurezza tramite PayPal inserendo articolo e importo.</p>
                     </div>
                     <div class="step-card">
                         <div class="step-number">04</div>
@@ -344,22 +344,7 @@
                 <div class="form-group"><label>Importo Pagato (€)</label><input type="text" id="pagImporto" placeholder="Es: 150.00" required></div>
                 <h3 style="margin: 20px 0 10px; font-size: 1.1rem; color: var(--primary);">Seleziona Metodo di Pagamento:</h3>
                 <button type="button" class="payment-option" onclick="registraElicaPagamento('PayPal')"><h4>🔵 Paga con PayPal (@MarcoTortoli)</h4><p>Verrai reindirizzato al link ufficiale PayPal protetto.</p></button>
-                <button type="button" class="payment-option" onclick="registraElicaPagamento('Bonifico Bancario Hype')"><h4>🏦 Bonifico Bancario (Hype)</h4><p>Visualizza l'IBAN intestato a Marco Tortoli.</p></button>
             {% endif %}
-        </div>
-    </div>
-
-    <div class="modal" id="modalBonifico" style="display: none;">
-        <div class="modal-content">
-            <button type="button" class="close-btn" onclick="chiudiBonifico()">&times;</button>
-            <h2>Bonifico Bancario Hype</h2>
-            <p style="margin-bottom: 15px; font-size: 0.9rem; color: #64748b;">Effettua il bonifico con i dati sottostanti:</p>
-            <div style="background: #f1f5f9; padding: 15px; border-radius: 12px; margin-bottom: 20px; font-size: 0.95rem; text-align: left;">
-                <p><strong>Banca:</strong> Hype</p>
-                <p><strong>Intestatario:</strong> Marco Tortoli</p>
-                <p><strong>IBAN:</strong> <span style="font-family: monospace; font-weight: bold;">IT63B03268223000EMH02521605</span></p>
-            </div>
-            <button type="button" class="btn" style="width: 100%;" onclick="chiudiBonifico()">Ho completato il pagamento</button>
         </div>
     </div>
 
@@ -389,7 +374,6 @@
                 }
             });
             scrollChatDown();
-            // Frequenza ottimizzata a 9 secondi per non sovraccaricare il database cloud
             setInterval(aggiornaDatiClienteInTempoReale, 9000);
         });
 
@@ -575,7 +559,7 @@
         }
         function apriPagamento() { document.getElementById('modalPagamento').style.display = 'flex'; }
         function chiudiPagamento() { document.getElementById('modalPagamento').style.display = 'none'; }
-        function chiudiBonifico() { document.getElementById('modalBonifico').style.display = 'none'; location.reload(); }
+        
         function registraElicaPagamento(metodo) {
             const prodotto = document.getElementById('pagProdotto').value.trim();
             const importo = document.getElementById('pagImporto').value.trim();
@@ -586,8 +570,7 @@
             }).then(() => {
                 chiudiPagamento();
                 aggiornaDatiClienteInTempoReale();
-                if(metodo === 'PayPal') { window.open("https://paypal.me/MarcoTortoli", "_blank"); }
-                else { document.getElementById('modalBonifico').style.display = 'flex'; }
+                window.open("https://paypal.me/MarcoTortoli", "_blank");
             });
         }
     </script>
