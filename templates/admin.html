@@ -3,81 +3,355 @@
 <head>
     <meta charset="UTF-8">
     <title>Pannello Admin - MyClothes</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f6f9; }
-        header { display: flex; justify-content: space-between; align-items: center; background: #222; color: white; padding: 10px 20px; border-radius: 6px; }
-        header h1 { margin: 0; font-size: 20px; }
-        header a { color: white; text-decoration: none; background: #c0392b; padding: 6px 12px; border-radius: 4px; }
-        .section { background: white; padding: 20px; margin-top: 20px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background: #333; color: white; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f1f5f9; padding: 20px; color: #334155; margin: 0; }
+        .container { max-width: 1100px; margin: 0 auto; background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h1 { font-size: 1.6rem; color: #0f172a; font-weight: 800; }
+        
+        .admin-nav { display: flex; gap: 10px; border-bottom: 2px solid #e2e8f0; margin-bottom: 25px; flex-wrap: wrap; }
+        .admin-nav-btn { padding: 10px 18px; border: none; background: none; font-size: 0.95rem; font-weight: 700; color: #64748b; cursor: pointer; border-bottom: 3px solid transparent; }
+        .admin-nav-btn.active { color: #6366f1; border-bottom-color: #6366f1; }
+        
+        .admin-section { display: none; }
+        .admin-section.active { display: block; }
+        
+        .ordine-admin-card, .user-admin-card, .review-admin-card { background: #f8fafc; border: 2px solid #e2e8f0; padding: 20px; border-radius: 16px; margin-bottom: 20px; }
+        .ordine-admin-card p, .user-admin-card p, .review-admin-card p { margin-bottom: 6px; font-size: 0.95rem; }
+        .select-stato { padding: 8px 12px; border: 2px solid #cbd5e1; border-radius: 8px; font-weight: 600; outline: none; }
+        
+        .btn { background: #0f172a; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+        .btn:hover { background: #334155; }
+        .btn-danger { background: #ef4444; }
+        .btn-archive { background: #64748b; }
+
+        .whatsapp-container { display: flex; height: 550px; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background: #f8fafc; }
+        .chat-sidebar { width: 320px; background: white; border-right: 1px solid #e2e8f0; overflow-y: auto; }
+        .chat-contact { padding: 15px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background 0.2s; }
+        .chat-contact:hover, .chat-contact.active { background: #e0e7ff; }
+        .chat-contact-title { font-weight: 700; font-size: 0.9rem; color: #0f172a; word-break: break-all; }
+        .chat-contact-sub { font-size: 0.8rem; color: #64748b; margin-top: 3px; }
+        
+        .chat-main-area { flex: 1; display: flex; flex-direction: column; background: #efeae2; position: relative; }
+        .chat-messages-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        .wa-bubble { padding: 10px 14px; border-radius: 12px; max-width: 70%; font-size: 0.9rem; position: relative; word-break: break-word; }
+        .wa-bubble.cliente { background: white; color: #111; align-self: flex-start; border-top-left-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .wa-bubble.admin { background: #d9fdd3; color: #111; align-self: flex-end; border-top-right-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .wa-bubble img { max-width: 180px; border-radius: 8px; margin-top: 6px; display: block; }
+        
+        .chat-input-bar { padding: 15px; background: #f0f2f5; display: flex; gap: 10px; align-items: center; border-top: 1px solid #e2e8f0; }
+        .chat-input-bar input { flex: 1; padding: 12px 16px; border: 1px solid #cbd5e1; border-radius: 20px; outline: none; font-size: 0.95rem; background: white; }
+        .no-chat-selected { display: flex; align-items: center; justify-content: center; height: 100%; color: #94a3b8; font-style: italic; }
     </style>
 </head>
 <body>
-
-    <header>
-        <h1>Pannello Amministrazione MyClothes</h1>
-        <a href="{{ url_for('logout_admin') }}">Logout Admin</a>
-    </header>
-
-    <div class="section">
-        <h2>Gestione Ordini Ricevuti (Pagamenti Verificati PayPal)</h2>
-        <div id="ordini-container">
-            <p>Caricamento dati in corso...</p>
+    <div class="container">
+        <div class="top-bar">
+            <h1>⚙️ Pannello Amministrazione MyClothes</h1>
+            <div>
+                <a href="/" class="btn" style="background:#e2e8f0; color:#0f172a; margin-right:8px; text-decoration:none;">← Torna al Sito</a>
+                <a href="/logout-admin" class="btn" style="background:#ef4444; text-decoration:none;">Esci Admin</a>
+            </div>
         </div>
-    </div>
 
-    <div class="section">
-        <h2>Utenti Registrati</h2>
-        <div id="utenti-container">
-            <p>Caricamento utenti...</p>
+        <div class="admin-nav">
+            <button type="button" class="admin-nav-btn active" onclick="mostraSezioneAdmin('ordini-attivi', this)">📦 Ordini Attivi</button>
+            <button type="button" class="admin-nav-btn" onclick="mostraSezioneAdmin('ordini-archiviati', this)">📁 Ordini Archiviati</button>
+            <button type="button" class="admin-nav-btn" onclick="mostraSezioneAdmin('chat-clienti', this)">💬 Chat Clienti</button>
+            <button type="button" class="admin-nav-btn" onclick="mostraSezioneAdmin('utenti-registrati', this)">👥 Utenti & Visitatori</button>
+            <button type="button" class="admin-nav-btn" onclick="mostraSezioneAdmin('recensioni-clienti', this)">⭐ Recensioni</button>
         </div>
+
+        <!-- SEZIONE ORDINI ATTIVI -->
+        <div id="sec-ordini-attivi" class="admin-section active">
+            <h2>Gestione Ordini in Corso</h2>
+            <p style="margin-bottom: 20px; color: #64748b;">Verifica i pagamenti, aggiorna le spedizioni o annulla gli ordini.</p>
+            <div id="adminOrdiniAttiviContainer"></div>
+        </div>
+
+        <!-- SEZIONE ORDINI ARCHIVIATI -->
+        <div id="sec-ordini-archiviati" class="admin-section">
+            <h2>📁 Archivio Ordini</h2>
+            <p style="margin-bottom: 20px; color: #64748b;">Storico separato degli ordini completati o annullati.</p>
+            <div id="adminOrdiniArchiviatiContainer"></div>
+        </div>
+
+        <!-- SEZIONE CHAT CLIENTE -->
+        <div id="sec-chat-clienti" class="admin-section">
+            <h2>💬 Chat Private con i Clienti</h2>
+            <p style="margin-bottom: 20px; color: #64748b;">Seleziona un cliente dalla lista per aprire la chat unita.</p>
+            
+            <div class="whatsapp-container">
+                <div class="chat-sidebar" id="adminChatSidebar"></div>
+
+                <div class="chat-main-area">
+                    <div id="no-chat-box" class="no-chat-selected">
+                        Seleziona una chat dalla lista a sinistra
+                    </div>
+
+                    <div id="active-chat-pane" style="display: none; height: 100%; flex-direction: column;">
+                        <div class="chat-messages-box" id="adminChatMessages"></div>
+                        <div class="chat-input-bar">
+                            <input type="text" id="adminInputRisposta" placeholder="Scrivi un messaggio..." autocomplete="off" onkeypress="handleAdminKeypress(event)">
+                            <button type="button" class="btn" style="background:#00a884;" onclick="inviaRispostaAdmin()">Invia</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEZIONE UTENTI & VISITATORI -->
+        <div id="sec-utenti-registrati" class="admin-section">
+            <h2>👥 Registro Utenti Registrati e Visitatori</h2>
+            <p style="margin-bottom: 20px; color: #64748b;">Monitora gli account con credenziali e gli utenti che visitano il sito senza registrazione.</p>
+            
+            <h3 style="font-size: 1.2rem; color: #0f172a; margin-top: 20px; margin-bottom: 10px;">✨ Account Registrati (Email e Password)</h3>
+            <div id="adminUtentiContainer"></div>
+
+            <h3 style="font-size: 1.2rem; color: #0f172a; margin-top: 30px; margin-bottom: 10px;">🌐 Visitatori / Utenti non registrati (Solo accesso al sito)</h3>
+            <div id="adminVisitatoriContainer"></div>
+        </div>
+
+        <!-- SEZIONE RECENSIONI -->
+        <div id="sec-recensioni-clienti" class="admin-section">
+            <h2>⭐ Gestione Recensioni Pubblicate</h2>
+            <p style="margin-bottom: 20px; color: #64748b;">Rimuovi eventuali recensioni inappropriate o non veritiere.</p>
+            <div id="adminRecensioniContainer"></div>
+        </div>
+
     </div>
 
     <script>
-        function caricaDatiAdmin() {
+        let currentSelectedUserId = null;
+
+        document.addEventListener("DOMContentLoaded", function() {
+            aggiornaDatiAdmin();
+            setInterval(aggiornaDatiAdmin, 3000);
+        });
+
+        function mostraSezioneAdmin(idSezione, btnElement) {
+            document.querySelectorAll('.admin-section').forEach(sec => sec.classList.remove('active'));
+            document.querySelectorAll('.admin-nav-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('sec-' + idSezione).classList.add('active');
+            if(btnElement) btnElement.classList.add('active');
+        }
+
+        function aggiornaDatiAdmin() {
             fetch('/api/admin/dati')
-            .then(res => res.json())
+            .then(res => {
+                if(!res.ok) return;
+                return res.json();
+            })
             .then(data => {
-                if(data.status === 'error') {
-                    window.location.href = '/admin';
-                    return;
+                if(!data) return;
+
+                // 1. Ordini Attivi
+                const attiviContainer = document.getElementById('adminOrdiniAttiviContainer');
+                if(data.tutti_ordini.length === 0) {
+                    attiviContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun ordine attivo al momento.</p>';
+                } else {
+                    let html = '';
+                    data.tutti_ordini.forEach(ord => {
+                        html += `<div class="ordine-admin-card">
+                            <p style="font-size: 1.2rem; color: #6366f1; font-weight: 800; margin-bottom: 8px;">Codice Ordine: ${ord.codice}</p>
+                            <p><strong>🛒 Articolo:</strong> <span style="font-weight:700;">${ord.prodotto}</span></p>
+                            <p><strong>💰 Importo:</strong> <span style="color: #059669; font-weight:700; font-size: 1.1rem;">€${ord.importo}</span></p>
+                            <p><strong>💳 Metodo:</strong> ${ord.metodo} | <strong>✉️ Email Cliente:</strong> ${ord.email}</p>`;
+                        
+                        if(ord.nome) {
+                            html += `<p><strong>👤 Spedizione a:</strong> ${ord.nome} - ${ord.indirizzo}, ${ord.citta}</p>`;
+                        } else {
+                            html += `<p style="color: #d97706; font-style: italic;">Indirizzo non ancora inserito dal cliente.</p>`;
+                        }
+
+                        html += `<p><strong>📌 Stato:</strong> <span style="font-weight:750;">${ord.stato}</span></p>`;
+                        if(ord.stato === 'Annullato') {
+                            html += `<p style="color: #ef4444; font-weight: 600;">Motivo annullamento: ${ord.motivo_annullamento}</p>`;
+                        }
+
+                        html += `<div style="margin-top: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">`;
+                        if(ord.stato === 'In attesa di verifica pagamento') {
+                            html += `<form action="/conferma-pagamento/${ord.id}" method="POST"><button type="submit" class="btn" style="background: #059669;">✔️ Conferma Pagamento</button></form>`;
+                        }
+                        if(ord.stato !== 'Annullato') {
+                            html += `<form action="/aggiorna-stato/${ord.id}" method="POST" style="display: flex; gap: 10px; align-items: center;">
+                                <select name="nuovo_stato" class="select-stato">
+                                    <option value="In elaborazione" ${ord.stato === 'In elaborazione' ? 'selected' : ''}>In elaborazione</option>
+                                    <option value="Spedito" ${ord.stato === 'Spedito' ? 'selected' : ''}>Spedito</option>
+                                    <option value="Arrivato" ${ord.stato === 'Arrivato' ? 'selected' : ''}>Arrivato</option>
+                                </select>
+                                <button type="submit" class="btn">Aggiorna Stato</button>
+                            </form>
+                            <form action="/annulla-ordine/${ord.id}" method="POST" style="display: flex; gap: 8px; align-items: center;">
+                                <input type="text" name="motivo" placeholder="Motivo annullamento..." required style="padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px;">
+                                <button type="submit" class="btn btn-danger">❌ Annulla</button>
+                            </form>`;
+                        }
+                        if(ord.stato === 'Arrivato' || ord.stato === 'Annullato') {
+                            html += `<form action="/archivia-ordine/${ord.id}" method="POST"><button type="submit" class="btn btn-archive">📂 Archivia Ordine</button></form>`;
+                        }
+                        html += `</div></div>`;
+                    });
+                    attiviContainer.innerHTML = html;
                 }
 
-                // Genera tabella ordini
-                let htmlOrdini = `<table>
-                    <tr>
-                        <th>Codice</th>
-                        <th>Email Cliente</th>
-                        <th>Prodotto</th>
-                        <th>Importo</th>
-                        <th>Stato</th>
-                    </tr>`;
-                
-                data.tutti_ordini.forEach(o => {
-                    htmlOrdini += `<tr>
-                        <td><b>${o.codice}</b></td>
-                        <td>${o.email}</td>
-                        <td>${o.prodotto}</td>
-                        <td>${o.importo} €</td>
-                        <td><span style="color: green; font-weight: bold;">${o.stato}</span></td>
-                    </tr>`;
-                });
-                htmlOrdini += `</table>`;
-                document.getElementById('ordini-container').innerHTML = htmlOrdini;
+                // 2. Ordini Archiviati
+                const archiviatiContainer = document.getElementById('adminOrdiniArchiviatiContainer');
+                if(data.archivio_ordini.length === 0) {
+                    archiviatiContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun ordine presente in archivio.</p>';
+                } else {
+                    let htmlArch = '';
+                    data.archivio_ordini.forEach(ord => {
+                        htmlArch += `<div class="ordine-admin-card" style="background: #f1f5f9;">
+                            <p style="font-size: 1.1rem; color: #64748b; font-weight: 800;">Codice Ordine: ${ord.codice}</p>
+                            <p><strong>🛒 Articolo:</strong> ${ord.prodotto} | <strong>Importo:</strong> €${ord.importo} | <strong>Cliente:</strong> ${ord.email}</p>
+                            <p><strong>📌 Stato Finale:</strong> ${ord.stato}</p>`;
+                        if(ord.motivo_annullamento) {
+                            htmlArch += `<p style="color: #ef4444; font-size: 0.85rem;">Motivo annullamento: ${ord.motivo_annullamento}</p>`;
+                        }
+                        htmlArch += `</div>`;
+                    });
+                    archiviatiContainer.innerHTML = htmlArch;
+                }
 
-                // Genera tabella utenti
-                let htmlUtenti = `<ul>`;
-                data.lista_utenti.forEach(u => {
-                    htmlUtenti += `<li><b>Email:</b> ${u.email} | <b>Data Registrazione:</b> ${u.data}</li>`;
-                });
-                htmlUtenti += `</ul>`;
-                document.getElementById('utenti-container').innerHTML = htmlUtenti;
+                // 3. Sidebar Contatti Chat
+                const sidebar = document.getElementById('adminChatSidebar');
+                if(Object.keys(data.chat_per_utente).length === 0) {
+                    sidebar.innerHTML = '<p style="padding: 15px; color: #94a3b8; font-style: italic;">Nessuna chat attiva.</p>';
+                } else {
+                    let sidebarHtml = '';
+                    for (const [userId, messaggi] of Object.entries(data.chat_per_utente)) {
+                        let emailCli = data.email_per_uid[userId] || 'Cliente Anonimo';
+                        let activeClass = currentSelectedUserId === userId ? 'active' : '';
+                        sidebarHtml += `<div class="chat-contact ${activeClass}" id="contact-${userId}" onclick="selezionaChat('${userId}', '${emailCli}')">
+                            <div class="chat-contact-title">👤 ${emailCli}</div>
+                            <div class="chat-contact-sub">ID: ${userId.substring(0, 8)}...</div>
+                        </div>`;
+                    }
+                    sidebar.innerHTML = sidebarHtml;
+                }
+
+                // 4. Utenti Registrati
+                const utentiContainer = document.getElementById('adminUtentiContainer');
+                if(data.lista_utenti.length === 0) {
+                    utentiContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun account con email registrato finora.</p>';
+                } else {
+                    let utentiHtml = '';
+                    data.lista_utenti.forEach(u => {
+                        utentiHtml += `<div class="user-admin-card">
+                            <p style="font-weight: 800; color: #6366f1; font-size: 1.1rem;">✉️ Email: ${u.email}</p>
+                            <p><strong>🔒 Password:</strong> ${u.password}</p>
+                            <p style="font-size: 0.8rem; color: #64748b;">ID Utente: ${u.user_id} | Registrato il: ${u.data}</p>
+                        </div>`;
+                    });
+                    utentiContainer.innerHTML = utentiHtml;
+                }
+
+                // 5. Visitatori non registrati
+                const visitatoriContainer = document.getElementById('adminVisitatoriContainer');
+                if(data.visitatori_non_registrati.length === 0) {
+                    visitatoriContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun visitatore anonimo recente.</p>';
+                } else {
+                    let visHtml = '';
+                    data.visitatori_non_registrati.forEach(v => {
+                        visHtml += `<div class="user-admin-card" style="background: #fffbeb; border-color: #fde68a;">
+                            <p style="font-weight: 700; color: #b45309;">🌐 Visitatore / Utente Senza Account</p>
+                            <p><strong>💻 Dispositivo (Browser/OS):</strong> ${v.user_agent}</p>
+                            <p><strong>🌍 Indirizzo IP:</strong> ${v.ip}</p>
+                            <p style="font-size: 0.8rem; color: #64748b;">ID Sessione: ${v.user_id} | Ultimo accesso: ${v.ultimo_accesso}</p>
+                        </div>`;
+                    });
+                    visitatoriContainer.innerHTML = visHtml;
+                }
+
+                // 6. Recensioni Clienti
+                const recensioniContainer = document.getElementById('adminRecensioniContainer');
+                if(data.lista_recensioni.length === 0) {
+                    recensioniContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessuna recensione pubblicata dai clienti.</p>';
+                } else {
+                    let recHtml = '';
+                    data.lista_recensioni.forEach(r => {
+                        let stelleStr = '★'.repeat(r.stelle);
+                        recHtml += `<div class="review-admin-card">
+                            <p style="color: #f59e0b; font-size: 1.2rem; font-weight: 800;">${stelleStr} (${r.stelle}/5)</p>
+                            <p><strong>👤 Cliente:</strong> ${r.email} | <strong>Ordine:</strong> ${r.codice_ordine} (${r.prodotto})</p>
+                            <p><strong>💬 Commento:</strong> "${r.commento}"</p>`;
+                        if(r.immagine) {
+                            recHtml += `<img src="${r.immagine}" alt="Foto recensione" style="max-width: 150px; border-radius: 8px; margin-top: 8px; display: block;">`;
+                        }
+                        recHtml += `<form action="/elimina-recensione/${r.id}" method="POST" style="margin-top: 12px;">
+                            <button type="submit" class="btn btn-danger" style="font-size: 0.8rem;">🗑️ Elimina Recensione</button>
+                        </form></div>`;
+                    });
+                    recensioniContainer.innerHTML = recHtml;
+                }
+
+                if(currentSelectedUserId) {
+                    caricaMessaggiAdminCorrente();
+                }
             });
         }
 
-        caricaDatiAdmin();
+        function selezionaChat(userId, email) {
+            currentSelectedUserId = userId;
+            document.getElementById('no-chat-box').style.display = 'none';
+            document.getElementById('active-chat-pane').style.display = 'flex';
+            
+            document.querySelectorAll('.chat-contact').forEach(c => c.classList.remove('active'));
+            const contactCard = document.getElementById('contact-' + userId);
+            if (contactCard) contactCard.classList.add('active');
+
+            caricaMessaggiAdminCorrente();
+        }
+
+        function caricaMessaggiAdminCorrente() {
+            if(!currentSelectedUserId) return;
+
+            fetch('/api/admin/chat/' + currentSelectedUserId)
+            .then(res => res.json())
+            .then(data => {
+                const msgBox = document.getElementById('adminChatMessages');
+                if(!msgBox) return;
+
+                let html = '';
+                data.forEach(m => {
+                    let mittenteLabel = m.mittente === 'admin' ? '<strong style="display:block; font-size:0.75rem; color:#059669; margin-bottom:2px;">Tu (Admin)</strong>' : '<strong style="display:block; font-size:0.75rem; color:#6366f1; margin-bottom:2px;">Cliente</strong>';
+                    let imgTag = m.immagine ? `<br><img src="${m.immagine}" alt="Foto">` : '';
+                    html += `<div class="wa-bubble ${m.mittente}">${mittenteLabel}${m.testo}${imgTag}</div>`;
+                });
+
+                const eraInFondo = msgBox.scrollHeight - msgBox.scrollTop <= msgBox.clientHeight + 50;
+                msgBox.innerHTML = html;
+                if(eraInFondo) {
+                    msgBox.scrollTop = msgBox.scrollHeight;
+                }
+            });
+        }
+
+        function handleAdminKeypress(e) {
+            if (e.key === 'Enter') {
+                inviaRispostaAdmin();
+            }
+        }
+
+        function inviaRispostaAdmin() {
+            if(!currentSelectedUserId) return;
+            const inputField = document.getElementById('adminInputRisposta');
+            const testo = inputField.value.trim();
+            if(!testo) return;
+
+            fetch('/api/admin/rispondi/' + currentSelectedUserId, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ risposta: testo })
+            }).then(res => {
+                if(res.ok) {
+                    inputField.value = '';
+                    caricaMessaggiAdminCorrente();
+                }
+            });
+        }
     </script>
 </body>
 </html>
