@@ -10,10 +10,15 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
         body { background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden; }
         
-        header { width: 100%; background: white; border-bottom: 1px solid #e2e8f0; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; z-index: 20; }
+        header { width: 100%; background: white; border-bottom: 1px solid #e2e8f0; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; z-index: 20; flex-wrap: wrap; gap: 10px; }
         .header-logo { font-size: 1.4rem; font-weight: 800; background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .header-right { display: flex; align-items: center; gap: 12px; }
+        .header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         
+        /* Stile pulito per il widget di traduzione Google */
+        .goog-te-banner-frame.skiptranslate { display: none !important; }
+        body { top: 0px !important; }
+        #google_translate_element select { padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; color: var(--primary); font-weight: 600; font-size: 0.85rem; outline: none; cursor: pointer; }
+
         .app-container { display: flex; flex: 1; position: relative; width: 100%; }
         
         sidebar { width: 260px; background: white; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; padding: 25px 15px; z-index: 10; flex-shrink: 0; }
@@ -104,6 +109,9 @@
     <header>
         <div class="header-logo">⚡ MyClothes</div>
         <div class="header-right">
+            <!-- Widget Traduttore Google -->
+            <div id="google_translate_element"></div>
+
             {% if user_email %}
                 <span style="font-size: 0.9rem; font-weight: 600; color: var(--primary);">👤 {{ user_email }}</span>
                 <a href="/logout-utente" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.80rem;">Esci</a>
@@ -347,6 +355,14 @@
             {% endif %}
         </div>
     </div>
+
+    <!-- Script Google Translate -->
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+          new google.translate.TranslateElement({pageLanguage: 'it', includedLanguages: 'en,es,fr,de,it', layout: google.translate.TranslateElement.InlineLayout.SIMPLE}, 'google_translate_element');
+        }
+    </script>
+    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
     <script>
         function mostraVista(nomeVista, elementoBtn) {
