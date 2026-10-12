@@ -1,620 +1,231 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
-import uuid
 import os
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 import psycopg2
 import psycopg2.extras
 
 app = Flask(__name__)
-app.secret_key = "chiave_segreta_super_sicura_myclothes"
+app.secret_key = 'super_secret_key_per_myclothes'  # Chiave segreta per le sessioni
 
-ADMIN_PASSWORD = "myclothesadmin!"
-
-# Prende la connessione da Render (Supabase), altrimenti usa un fallback locale se testato in locale
-DATABASE_URL = os.environ.get("DATABASE_URL")
+# Connessione al database PostgreSQL su Supabase (con connection pooling sulla porta 6543)
+DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://postgres.wmnotzgjuamxsgczwpmt:TuaPasswordQui@aws-0-eu-central-1.pooler.supabase.com:6543/postgres')
 
 def get_db_connection():
-    if DATABASE_URL:
-        conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor)
-    else:
-        # Fallback locale se non configurato (puoi ignorarlo se usi Supabase su Render)
-        raise RuntimeError("DATABASE_URL non configurata!")
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor)
     return conn
 
+# Inizializzazione delle tabelle nel database se non esistono
 def init_db():
     conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # Tabella Utenti Registrati
-    cursor.execute('''
+    cur = conn.cursor()
+    # Tabella Utenti
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS utenti (
-            email TEXT PRIMARY KEY,
-            password TEXT NOT NULL,
-            user_id TEXT NOT NULL,
-            data_creazione TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    # Tabella Visitatori / Accessi al sito
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS visitatori (
-            user_id TEXT PRIMARY KEY,
-            user_agent TEXT,
-            ip_address TEXT,
-            ultimo_accesso TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    # Tabella Chat
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS chat (
             id SERIAL PRIMARY KEY,
-            user_id TEXT NOT NULL,
-            mittente TEXT NOT NULL,
-            testo TEXT,
-            immagine TEXT
-        )
-    ''')
-    # Tabella Ordini
-    cursor.execute('''
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL
+        );
+    """)
+    # Tabella Ordini (Aggiornata per PayPal automatico e senza bonifico/approvazione manuale)
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS ordini (
-            id TEXT PRIMARY KEY,
-            codice TEXT NOT NULL,
-            user_id TEXT NOT NULL,
-            email TEXT NOT NULL,
-            prodotto TEXT NOT NULL,
-            importo TEXT NOT NULL,
-            metodo TEXT NOT NULL,
-            stato TEXT NOT NULL,
-            motivo_annullamento TEXT,
-            nome TEXT,
-            indirizzo TEXT,
-            citta TEXT
-        )
-    ''')
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES utenti(id),
+            paypal_order_id TEXT,
+            importo REAL NOT NULL,
+            stato TEXT DEFAULT 'Pagato',
+            data_ordine TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
     # Tabella Recensioni
-    cursor.execute('''
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS recensioni (
             id SERIAL PRIMARY KEY,
-            ordine_id TEXT NOT NULL,
-            codice_ordine TEXT NOT NULL,
-            email TEXT NOT NULL,
-            prodotto TEXT NOT NULL,
-            stelle INTEGER NOT NULL,
-            commento TEXT,
-            immagine TEXT,
-            data_creazione TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    # Tabella Contatore Ordini
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS contatore (
-            id INTEGER PRIMARY KEY,
-            valore INTEGER NOT NULL
-        )
-    ''')
-    cursor.execute('SELECT valore FROM contatore WHERE id = 1')
-    if not cursor.fetchone():
-        cursor.execute('INSERT INTO contatore (id, valore) VALUES (1, 0)')
-    
+            autore TEXT NOT NULL,
+            testo TEXT NOT NULL,
+            data TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    # Tabella Chat
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS chat (
+            id SERIAL PRIMARY KEY,
+            mittente TEXT NOT NULL,
+            messaggio TEXT NOT NULL,
+            data TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    # Tabella Log Visitatori (Tracciamento anonimo)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS visitatori (
+            id SERIAL PRIMARY KEY,
+            ip TEXT,
+            user_agent TEXT,
+            session_id TEXT,
+            data_visita TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
     conn.commit()
-    cursor.close()
+    cur.close()
     conn.close()
 
-# Inizializza il database all'avvio
+# Eseguiamo l'inizializzazione all'avvio
 init_db()
 
-def get_current_user():
-    return session.get('user_email')
-
-def get_user_id():
-    if 'user_email' in session:
-        email = session['user_email']
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT user_id FROM utenti WHERE email = %s', (email,))
-        row = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        if row:
-            uid = row[0]
-            registra_visitatore(uid)
-            return uid
-            
-    if 'user_id' not in session:
-        session['user_id'] = str(uuid.uuid4())
-        
-    uid = session['user_id']
-    registra_visitatore(uid)
-    return uid
-
-def registra_visitatore(uid):
-    user_agent = request.headers.get('User-Agent', 'Dispositivo sconosciuto')
-    ip_address = request.remote_addr or 'IP non disponibile'
+@app.before_request
+def registra_visitatore():
+    # Tracciamento automatico dei visitatori
+    ip = request.remote_addr
+    user_agent = request.headers.get('User-Agent')
+    session_id = session.get('sid', 'anonimo')
     
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO visitatori (user_id, user_agent, ip_address, ultimo_accesso)
-        VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
-        ON CONFLICT (user_id) DO UPDATE SET 
-        ultimo_accesso = CURRENT_TIMESTAMP,
-        user_agent = EXCLUDED.user_agent,
-        ip_address = EXCLUDED.ip_address
-    ''', (uid, user_agent, ip_address))
-    conn.commit()
-    cursor.close()
-    conn.close()
+    cur = conn.cursor()
+    try:
+        cur.execute("INSERT INTO visitatori (ip, user_agent, session_id) VALUES (%s, %s, %s)", (ip, user_agent, session_id))
+        conn.commit()
+    except:
+        pass
+    finally:
+        cur.close()
+        conn.close()
 
+# ---- ROTTA: INDEX (Homepage & Catalogo) ----
 @app.route('/')
-def home():
-    uid = get_user_id()
-    user_email = get_current_user()
-    
-    auth_error = session.pop('auth_error', None)
-    active_tab = session.pop('active_tab', 'login')
-    
+def index():
     conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT mittente, testo, immagine FROM chat WHERE user_id = %s', (uid,))
-    chat_rows = cursor.fetchall()
-    chat_utente = [{"mittente": r['mittente'], "testo": r['testo'], "immagine": r['immagine']} for r in chat_rows]
-    
-    cursor.execute('SELECT id, codice, prodotto, importo, metodo, stato, motivo_annullamento, nome, indirizzo, citta FROM ordini WHERE user_id = %s', (uid,))
-    ord_rows = cursor.fetchall()
-    ordini_utente = [{
-        "id": r['id'], "codice": r['codice'], "prodotto": r['prodotto'], "importo": r['importo'],
-        "metodo": r['metodo'], "stato": r['stato'], "motivo_annullamento": r['motivo_annullamento'],
-        "nome": r['nome'], "indirizzo": r['indirizzo'], "citta": r['citta']
-    } for r in ord_rows]
-
-    cursor.execute('SELECT codice_ordine, email, prodotto, stelle, commento, immagine FROM recensioni ORDER BY id DESC')
-    rec_rows = cursor.fetchall()
-    tutte_recensioni = [{
-        "codice_ordine": r['codice_ordine'], "email": r['email'], "prodotto": r['prodotto'],
-        "stelle": r['stelle'], "commento": r['commento'], "immagine": r['immagine']
-    } for r in rec_rows]
-    
-    cursor.close()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM recensioni ORDER BY data DESC;")
+    recensioni = cur.fetchall()
+    cur.close()
     conn.close()
-    
-    return render_template('index.html', 
-                           user_email=user_email,
-                           auth_error=auth_error,
-                           active_tab=active_tab,
-                           chat_utente=chat_utente, 
-                           ordini_utente=ordini_utente,
-                           tutte_recensioni=tutte_recensioni)
+    return render_template('index.html', recensioni=recensioni)
 
-@app.route('/login-utente', methods=['POST'])
-def login_utente():
-    email = request.form.get('email', '').strip().lower()
-    password = request.form.get('password', '').strip()
-    
-    if not email or not password:
-        session['auth_error'] = "Inserisci sia l'email che la password per accedere."
-        session['active_tab'] = 'login'
-        return redirect(url_for('home'))
+# ---- ROTTA: LOGIN & REGISTRAZIONE ----
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
         
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT password, user_id FROM utenti WHERE email = %s', (email,))
-    row = cursor.fetchone()
-    cursor.close()
-    conn.close()
-    
-    if not row:
-        session['auth_error'] = "Account non trovato. Registrati prima!"
-        session['active_tab'] = 'login'
-        return redirect(url_for('home'))
-        
-    if row['password'] != password:
-        session['auth_error'] = "Password errata! Riprova."
-        session['active_tab'] = 'login'
-        return redirect(url_for('home'))
-        
-    session['user_email'] = email
-    session['user_id'] = row['user_id']
-    return redirect(url_for('home'))
-
-@app.route('/registra-utente', methods=['POST'])
-def registra_utente():
-    email = request.form.get('email', '').strip().lower()
-    password = request.form.get('password', '').strip()
-    password_confirm = request.form.get('password_confirm', '').strip()
-    
-    if not email or not password or not password_confirm:
-        session['auth_error'] = "Compila tutti i campi inclusa la password."
-        session['active_tab'] = 'register'
-        return redirect(url_for('home'))
-        
-    if password != password_confirm:
-        session['auth_error'] = "Le due password non coincidono!"
-        session['active_tab'] = 'register'
-        return redirect(url_for('home'))
-        
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT email FROM utenti WHERE email = %s', (email,))
-    if cursor.fetchone():
-        cursor.close()
-        conn.close()
-        session['auth_error'] = "Questa email è già registrata! Effettua il login."
-        session['active_tab'] = 'register'
-        return redirect(url_for('home'))
-        
-    user_id = session.get('user_id', str(uuid.uuid4()))
-    cursor.execute('INSERT INTO utenti (email, password, user_id) VALUES (%s, %s, %s)', (email, password, user_id))
-    conn.commit()
-    cursor.close()
-    conn.close()
-    
-    session['user_email'] = email
-    session['user_id'] = user_id
-    return redirect(url_for('home'))
-
-@app.route('/login-google', methods=['POST'])
-def login_google():
-    data = request.get_json() or {}
-    email = data.get('email', '').strip().lower()
-    password = data.get('password', '').strip()
-    
-    if not email or not password:
-        return jsonify({"status": "error", "message": "Email e password richieste."}), 400
-        
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT password, user_id FROM utenti WHERE email = %s', (email,))
-    row = cursor.fetchone()
-    
-    if row:
-        if row['password'] != password:
-            cursor.close()
-            conn.close()
-            return jsonify({"status": "error", "message": "Password errata per questo account!"}), 401
-        user_id = row['user_id']
-    else:
-        user_id = session.get('user_id', str(uuid.uuid4()))
-        cursor.execute('INSERT INTO utenti (email, password, user_id) VALUES (%s, %s, %s)', (email, password, user_id))
-        conn.commit()
-        
-    cursor.close()
-    conn.close()
-    session['user_email'] = email
-    session['user_id'] = user_id
-    return jsonify({"status": "success"})
-
-@app.route('/logout-utente')
-def logout_utente():
-    session.pop('user_email', None)
-    session.pop('user_id', None)
-    return redirect(url_for('home'))
-
-@app.route('/invia', methods=['POST'])
-def invia():
-    uid = get_user_id()
-    data = request.get_json() or {}
-    testo = data.get('testo', '')
-    immagine = data.get('immagine', '')
-    
-    if testo or immagine:
         conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('INSERT INTO chat (user_id, mittente, testo, immagine) VALUES (%s, %s, %s, %s)', (uid, 'cliente', testo, immagine))
-        conn.commit()
-        cursor.close()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM utenti WHERE username = %s AND password = %s", (username, password))
+        utente = cur.fetchone()
+        cur.close()
         conn.close()
-    return jsonify({"status": "success"})
-
-@app.route('/api/chat-utente', methods=['GET'])
-def api_chat_utente():
-    uid = get_user_id()
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT mittente, testo, immagine FROM chat WHERE user_id = %s', (uid,))
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return jsonify([{"mittente": r['mittente'], "testo": r['testo'], "immagine": r['immagine']} for r in rows])
-
-@app.route('/api/ordini-utente', methods=['GET'])
-def api_ordini_utente():
-    uid = get_user_id()
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT id, codice, prodotto, importo, metodo, stato, motivo_annullamento, nome, indirizzo, citta FROM ordini WHERE user_id = %s', (uid,))
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return jsonify([{
-        "id": r['id'], "codice": r['codice'], "prodotto": r['prodotto'], "importo": r['importo'],
-        "metodo": r['metodo'], "stato": r['stato'], "motivo_annullamento": r['motivo_annullamento'],
-        "nome": r['nome'], "indirizzo": r['indirizzo'], "citta": r['citta']
-    } for r in rows])
-
-@app.route('/registra-pagamento', methods=['POST'])
-def registra_pagamento():
-    if not get_current_user():
-        return jsonify({"status": "error", "message": "Devi accedere per acquistare."}), 401
         
-    uid = get_user_id()
-    email = get_current_user()
-    data = request.get_json() or {}
-    
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT valore FROM contatore WHERE id = 1')
-    val = cursor.fetchone()['valore'] + 1
-    cursor.execute('UPDATE contatore SET valore = %s WHERE id = 1', (val,))
-    
-    codice_ordine = f"#{val:04d}"
-    ordine_id = str(uuid.uuid4())[:8]
-    
-    cursor.execute('''
-        INSERT INTO ordini (id, codice, user_id, email, prodotto, importo, metodo, stato, motivo_annullamento, nome, indirizzo, citta)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    ''', (ordine_id, codice_ordine, uid, email, data.get('prodotto'), data.get('importo'), data.get('metodo'), 'In attesa di verifica pagamento', '', '', '', ''))
-    
-    conn.commit()
-    cursor.close()
-    conn.close()
-    
-    return jsonify({"status": "success"})
+        if utente:
+            session['user_id'] = utente['id']
+            session['username'] = utente['username']
+            return redirect(url_for('index'))
+        else:
+            return render_template('login.html', errore="Credenziali non valide")
+            
+    return render_template('login.html')
 
-@app.route('/salva-spedizione/<ordine_id>', methods=['POST'])
-def salva_spedizione(ordine_id):
-    nome = request.form.get('nome')
-    indirizzo = request.form.get('indirizzo')
-    citta = request.form.get('citta')
-    
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE ordini SET nome = %s, indirizzo = %s, citta = %s, stato = "In elaborazione" WHERE id = %s', (nome, indirizzo, citta, ordine_id))
-    conn.commit()
-    cursor.close()
-    conn.close()
-    
-    return redirect(url_for('home'))
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('index'))
 
-@app.route('/elimina-ordine-cliente/<ordine_id>', methods=['POST'])
-def elimina_ordine_cliente(ordine_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM ordini WHERE id = %s AND (stato = "Arrivato" OR stato = "Annullato")', (ordine_id,))
-    conn.commit()
-    cursor.close()
-    conn.close()
-    
-    return redirect(url_for('home'))
-
-@app.route('/invia-recensione/<ordine_id>', methods=['POST'])
-def invia_recensione(ordine_id):
-    email = get_current_user()
-    if not email:
-        return jsonify({"status": "error", "message": "Devi essere loggato."}), 401
+# ---- ROTTA: CHECKOUT & PAGAMENTO AUTOMATICO PAYPAL ----
+@app.route('/conferma-pagamento-paypal', methods=['POST'])
+def conferma_pagamento_paypal():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Utente non autenticato'}), 401
         
-    data = request.get_json() or {}
-    stelle = int(data.get('stelle', 5))
-    commento = data.get('commento', '').strip()
-    immagine = data.get('immagine', '')
+    data = request.get_json()
+    order_id = data.get('orderID')
+    details = data.get('details')
     
+    if not details or details.get('status') != 'COMPLETED':
+        return jsonify({'success': False, 'error': 'Pagamento PayPal non completato'}), 400
+
+    user_id = session['user_id']
+    importo = details['purchase_units'][0]['amount']['value']
+
     conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT codice, prodotto, stato FROM ordini WHERE id = %s', (ordine_id,))
-    row = cursor.fetchone()
-    if row and row['stato'] == 'Arrivato':
-        codice_ordine = row['codice']
-        prodotto = row['prodotto']
+    cur = conn.cursor()
+    try:
+        # Inserisce l'ordine direttamente come 'Pagato' (Nessuna approvazione manuale dell'admin richiesta)
+        cur.execute("""
+            INSERT INTO ordini (user_id, paypal_order_id, importo, stato)
+            VALUES (%s, %s, %s, 'Pagato')
+            RETURNING id;
+        """, (user_id, order_id, importo))
         
-        cursor.execute('''
-            INSERT INTO recensioni (ordine_id, codice_ordine, email, prodotto, stelle, commento, immagine)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ''', (ordine_id, codice_ordine, email, prodotto, stelle, commento, immagine))
         conn.commit()
-        cursor.close()
+        cur.close()
         conn.close()
-        return jsonify({"status": "success"})
         
-    cursor.close()
-    conn.close()
-    return jsonify({"status": "error", "message": "Ordine non valido o non ancora arrivato."}), 400
+        return jsonify({'success': True})
+    except Exception as e:
+        conn.rollback()
+        cur.close()
+        conn.close()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
+# ---- ROTTA: MIEI ORDINI (Reindirizzamento post-pagamento) ----
+@app.route('/miei-ordini')
+def miei_ordini():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+        
+    user_id = session['user_id']
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT id, paypal_order_id, importo, stato, data_ordine 
+        FROM ordini 
+        WHERE user_id = %s 
+        ORDER BY data_ordine DESC;
+    """, (user_id,))
+    ordini = cur.fetchall()
+    
+    cur.close()
+    conn.close()
+    
+    return render_template('miei_ordini.html', ordini=ordini)
+
+# ---- ROTTA: ADMIN (Pannello di controllo) ----
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
-    if session.get('admin_logged_in'):
-        return render_template('admin.html')
-    
-    errore = False
+    # Semplice controllo password admin
+    auth = request.args.get('pwd') == 'myclothesadmin' or session.get('is_admin')
     if request.method == 'POST':
-        if request.form.get('password') == ADMIN_PASSWORD:
-            session['admin_logged_in'] = True
-            return render_template('admin.html')
+        if request.form.get('password') == 'myclothesadmin':
+            session['is_admin'] = True
+            auth = True
         else:
-            errore = True
-            
-    return render_template('login.html', errore=errore)
+            return render_template('admin.html', errore="Password errata", auth=False)
 
-@app.route('/logout-admin')
-def logout_admin():
-    session.pop('admin_logged_in', None)
-    return redirect(url_for('admin'))
+    if not auth:
+        return render_template('admin.html', auth=False)
 
-@app.route('/conferma-pagamento/<ordine_id>', methods=['POST'])
-def conferma_pagamento(ordine_id):
-    if not session.get('admin_logged_in'):
-        return redirect(url_for('admin'))
-        
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE ordini SET stato = "Pagamento Verificato - Inserisci Spedizione" WHERE id = %s', (ordine_id,))
-    conn.commit()
-    cursor.close()
+    cur = conn.cursor()
+    
+    # Recupera tutti gli ordini (già pagati in automatico)
+    cur.execute("""
+        SELECT ordini.*, utenti.username 
+        FROM ordini 
+        JOIN utenti ON ordini.user_id = utenti.id 
+        ORDER BY data_ordine DESC;
+    """)
+    ordini = cur.fetchall()
+    
+    # Recupera utenti registrati e visitatori anonimi
+    cur.execute("SELECT * FROM utenti;")
+    utenti = cur.fetchall()
+    
+    cur.execute("SELECT * FROM visitatori ORDER BY data_visita DESC LIMIT 50;")
+    visitatori = cur.fetchall()
+    
+    cur.close()
     conn.close()
     
-    return redirect(url_for('admin'))
-
-@app.route('/annulla-ordine/<ordine_id>', methods=['POST'])
-def annulla_ordine(ordine_id):
-    if not session.get('admin_logged_in'):
-        return redirect(url_for('admin'))
-        
-    motivo = request.form.get('motivo', 'Nessun motivo specificato.')
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE ordini SET stato = "Annullato", motivo_annullamento = %s WHERE id = %s', (motivo, ordine_id))
-    conn.commit()
-    cursor.close()
-    conn.close()
-    
-    return redirect(url_for('admin'))
-
-@app.route('/aggiorna-stato/<ordine_id>', methods=['POST'])
-def aggiorna_stato(ordine_id):
-    if not session.get('admin_logged_in'):
-        return redirect(url_for('admin'))
-        
-    nuovo_stato = request.form.get('nuovo_stato')
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE ordini SET stato = %s WHERE id = %s', (nuovo_stato, ordine_id))
-    conn.commit()
-    cursor.close()
-    conn.close()
-    
-    return redirect(url_for('admin'))
-
-@app.route('/archivia-ordine/<ordine_id>', methods=['POST'])
-def archivia_ordine(ordine_id):
-    if not session.get('admin_logged_in'):
-        return redirect(url_for('admin'))
-        
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE ordini SET stato = "Archiviato" WHERE id = %s AND (stato = "Arrivato" OR stato = "Annullato")', (ordine_id,))
-    conn.commit()
-    cursor.close()
-    conn.close()
-    
-    return redirect(url_for('admin'))
-
-@app.route('/elimina-recensione/<int:rec_id>', methods=['POST'])
-def elimina_recensione(rec_id):
-    if not session.get('admin_logged_in'):
-        return redirect(url_for('admin'))
-        
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM recensioni WHERE id = %s', (rec_id,))
-    conn.commit()
-    cursor.close()
-    conn.close()
-    
-    return redirect(url_for('admin'))
-
-@app.route('/api/admin/dati', methods=['GET'])
-def api_admin_dati():
-    if not session.get('admin_logged_in'):
-        return jsonify({"status": "error"}), 401
-        
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT id, codice, user_id, email, prodotto, importo, metodo, stato, motivo_annullamento, nome, indirizzo, citta FROM ordini')
-    rows = cursor.fetchall()
-    
-    tutti_ordini = []
-    archivio_ordini = []
-    
-    for r in rows:
-        ord_obj = {
-            "id": r['id'], "codice": r['codice'], "user_id": r['user_id'], "email": r['email'],
-            "prodotto": r['prodotto'], "importo": r['importo'], "metodo": r['metodo'], "stato": r['stato'],
-            "motivo_annullamento": r['motivo_annullamento'], "nome": r['nome'], "indirizzo": r['indirizzo'], "citta": r['citta']
-        }
-        if r['stato'] == 'Archiviato':
-            archivio_ordini.append(ord_obj)
-        else:
-            tutti_ordini.append(ord_obj)
-            
-    cursor.execute('SELECT user_id, mittente, testo, immagine FROM chat')
-    chat_rows = cursor.fetchall()
-    chat_per_utente = {}
-    for cr in chat_rows:
-        u_id = cr['user_id']
-        if u_id not in chat_per_utente:
-            chat_per_utente[u_id] = []
-        chat_per_utente[u_id].append({"mittente": cr['mittente'], "testo": cr['testo'], "immagine": cr['immagine']})
-        
-    cursor.execute('SELECT email, password, user_id, data_creazione FROM utenti')
-    user_rows = cursor.fetchall()
-    lista_utenti = [{"email": ur['email'], "password": ur['password'], "user_id": ur['user_id'], "data": str(ur['data_creazione'])} for ur in user_rows]
-    email_per_uid = {ur['user_id']: ur['email'] for ur in user_rows}
-
-    cursor.execute('SELECT user_id, user_agent, ip_address, ultimo_accesso FROM visitatori ORDER BY ultimo_accesso DESC')
-    visitatori_rows = cursor.fetchall()
-    
-    registered_uids = {ur['user_id'] for ur in user_rows}
-    
-    visitatori_non_registrati = []
-    for vr in visitatori_rows:
-        v_uid = vr['user_id']
-        if v_uid not in registered_uids:
-            visitatori_non_registrati.append({
-                "user_id": v_uid,
-                "user_agent": vr['user_agent'],
-                "ip": vr['ip_address'],
-                "ultimo_accesso": str(vr['ultimo_accesso'])
-            })
-
-    cursor.execute('SELECT id, ordine_id, codice_ordine, email, prodotto, stelle, commento, immagine FROM recensioni ORDER BY id DESC')
-    rec_rows = cursor.fetchall()
-    lista_recensioni = [{
-        "id": r['id'], "ordine_id": r['ordine_id'], "codice_ordine": r['codice_ordine'], "email": r['email'],
-        "prodotto": r['prodotto'], "stelle": r['stelle'], "commento": r['commento'], "immagine": r['immagine']
-    } for r in rec_rows]
-    
-    cursor.close()
-    conn.close()
-    
-    return jsonify({
-        "tutti_ordini": tutti_ordini,
-        "archivio_ordini": archivio_ordini,
-        "chat_per_utente": chat_per_utente,
-        "lista_utenti": lista_utenti,
-        "visitatori_non_registrati": visitatori_non_registrati,
-        "lista_recensioni": lista_recensioni,
-        "email_per_uid": email_per_uid
-    })
-
-@app.route('/api/admin/chat/<user_id>', methods=['GET'])
-def api_admin_get_chat(user_id):
-    if not session.get('admin_logged_in'):
-        return jsonify({"status": "error"}), 401
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT mittente, testo, immagine FROM chat WHERE user_id = %s', (user_id,))
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return jsonify([{"mittente": r['mittente'], "testo": r['testo'], "immagine": r['immagine']} for r in rows])
-
-@app.route('/api/admin/rispondi/<user_id>', methods=['POST'])
-def api_admin_rispondi(user_id):
-    if not session.get('admin_logged_in'):
-        return jsonify({"status": "error"}), 401
-        
-    data = request.get_json() or {}
-    testo_risposta = data.get('risposta', '').strip()
-    
-    if testo_risposta:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('INSERT INTO chat (user_id, mittente, testo, immagine) VALUES (%s, %s, %s, %s)', (user_id, 'admin', testo_risposta, ''))
-        conn.commit()
-        cursor.close()
-        conn.close()
-        return jsonify({"status": "success"})
-    return jsonify({"status": "empty"}), 400
+    return render_template('admin.html', auth=True, ordini=ordini, utenti=utenti, visitatori=visitatori)
 
 if __name__ == '__main__':
     app.run(debug=True)
