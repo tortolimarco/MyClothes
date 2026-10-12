@@ -250,11 +250,12 @@ def home():
 
   execute_query(
       cursor,
-      "SELECT mittente, testo, immagine FROM chat WHERE user_id = ?",
+      "SELECT id, mittente, testo, immagine FROM chat WHERE user_id = ?"
+      " ORDER BY id ASC",
       (uid,),
   )
   chat_utente = [
-      {"mittente": r[0], "testo": r[1], "immagine": r[2]}
+      {"id": r[0], "mittente": r[1], "testo": r[2], "immagine": r[3]}
       for r in cursor.fetchall()
   ]
 
@@ -480,15 +481,83 @@ def api_chat_utente():
   cursor = conn.cursor()
   execute_query(
       cursor,
-      "SELECT mittente, testo, immagine FROM chat WHERE user_id = ?",
+      "SELECT id, mittente, testo, immagine FROM chat WHERE user_id = ?"
+      " ORDER BY id ASC",
       (uid,),
   )
   rows = cursor.fetchall()
   cursor.close()
   release_db_connection(conn)
   return jsonify(
-      [{"mittente": r[0], "testo": r[1], "immagine": r[2]} for r in rows]
+      [{"id": r[0], "mittente": r[1], "testo": r[2], "immagine": r[3]} for r in rows]
   )
+
+
+@app.route("/api/chat/modifica/<int:msg_id>", methods=["POST"])
+def modifica_messaggio(msg_id):
+  uid = get_user_id()
+  data = request.get_json() or {}
+  nuovo_testo = data.get("testo", "").strip()
+
+  if not nuovo_testo:
+    return jsonify({"status": "error", "message": "Testo vuoto"}), 400
+
+  conn = get_db_connection()
+  cursor = conn.cursor()
+
+  if session.get("admin_logged_in"):
+    execute_query(
+        cursor,
+        "UPDATE chat SET testo = ? WHERE id = ?",
+        (nuovo_testo, msg_id),
+    )
+  else:
+    execute_query(
+        cursor,
+        "UPDATE chat SET testo = ? WHERE id = ? AND user_id = ? AND mittente ="
+        " 'cliente'",
+        (nuovo_testo, msg_id, uid),
+    )
+
+  conn.commit()
+  cursor.close()
+  release_db_connection(conn)
+  return jsonify({"status": "success"})
+
+
+@app.route("/api/chat/elimina/<int:msg_id>", methods=["POST"])
+def elimina_messaggio(msg_id):
+  uid = get_user_id()
+  conn = get_db_connection()
+  cursor = conn.cursor()
+
+  if session.get("admin_logged_in"):
+    execute_query(cursor, "DELETE FROM chat WHERE id = ?", (msg_id,))
+  else:
+    execute_query(
+        cursor,
+        "DELETE FROM chat WHERE id = ? AND user_id = ? AND mittente = 'cliente'",
+        (msg_id, uid),
+    )
+
+  conn.commit()
+  cursor.close()
+  release_db_connection(conn)
+  return jsonify({"status": "success"})
+
+
+@app.route("/api/admin/chat/svuota/<user_id>", methods=["POST"])
+def api_admin_svuota_chat(user_id):
+  if not session.get("admin_logged_in"):
+    return jsonify({"status": "error"}), 401
+
+  conn = get_db_connection()
+  cursor = conn.cursor()
+  execute_query(cursor, "DELETE FROM chat WHERE user_id = ?", (user_id,))
+  conn.commit()
+  cursor.close()
+  release_db_connection(conn)
+  return jsonify({"status": "success"})
 
 
 @app.route("/api/ordini-utente", methods=["GET"])
@@ -857,7 +926,6 @@ def api_admin_dati():
   ]
   email_per_uid = {ur[2]: ur[0] for ur in user_rows}
 
-  # Limite agli ultimi 10 visitatori
   execute_query(
       cursor,
       (
@@ -866,18 +934,20 @@ def api_admin_dati():
       ),
   )
   visitatori_rows = cursor.fetchall()
-  registered_uids = {ur[2] for ur in user_rows}
 
-  visitatori_non_registrati = []
+  visitatori_completi = []
   for vr in visitatori_rows:
     v_uid = vr[0]
-    if v_uid not in registered_uids:
-      visitatori_non_registrati.append({
-          "user_id": v_uid,
-          "user_agent": vr[1],
-          "ip": vr[2],
-          "ultimo_accesso": str(vr[3]),
-      })
+    registrato = v_uid in email_per_uid
+    email_assoc = email_per_uid.get(v_uid, "")
+    visitatori_completi.append({
+        "user_id": v_uid,
+        "user_agent": vr[1],
+        "ip": vr[2],
+        "ultimo_accesso": str(vr[3]),
+        "registrato": registrato,
+        "email": email_assoc,
+    })
 
   execute_query(
       cursor,
@@ -909,7 +979,7 @@ def api_admin_dati():
       "archivio_ordini": archivio_ordini,
       "chat_per_utente": chat_per_utente,
       "lista_utenti": lista_utenti,
-      "visitatori_non_registrati": visitatori_non_registrati,
+      "visitatori_non_registrati": visitatori_completi,
       "lista_recensioni": lista_recensioni,
       "email_per_uid": email_per_uid,
   })
@@ -923,14 +993,15 @@ def api_admin_get_chat(user_id):
   cursor = conn.cursor()
   execute_query(
       cursor,
-      "SELECT mittente, testo, immagine FROM chat WHERE user_id = ?",
+      "SELECT id, mittente, testo, immagine FROM chat WHERE user_id = ?"
+      " ORDER BY id ASC",
       (user_id,),
   )
   rows = cursor.fetchall()
   cursor.close()
   release_db_connection(conn)
   return jsonify(
-      [{"mittente": r[0], "testo": r[1], "immagine": r[2]} for r in rows]
+      [{"id": r[0], "mittente": r[1], "testo": r[2], "immagine": r[3]} for r in rows]
   )
 
 
