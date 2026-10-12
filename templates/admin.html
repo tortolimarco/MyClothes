@@ -2,83 +2,82 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Admin - MyClothes</title>
+    <title>Pannello Admin - MyClothes</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f4f6f9; }
-        .card { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f6f9; }
+        header { display: flex; justify-content: space-between; align-items: center; background: #222; color: white; padding: 10px 20px; border-radius: 6px; }
+        header h1 { margin: 0; font-size: 20px; }
+        header a { color: white; text-decoration: none; background: #c0392b; padding: 6px 12px; border-radius: 4px; }
+        .section { background: white; padding: 20px; margin-top: 20px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background: #333; color: white; }
-        input, button { padding: 8px; margin: 5px 0; }
-        button { background: #333; color: white; border: none; cursor: pointer; border-radius: 4px; }
     </style>
 </head>
 <body>
-    <h1>Pannello di Amministrazione MyClothes</h1>
-    <a href="/">Torna al sito</a>
 
-    {% if not auth %}
-    <div class="card" style="max-width: 300px; margin-top: 50px;">
-        <h3>Login Admin</h3>
-        {% if errore %}<p style="color:red;">{{ errore }}</p>{% endif %}
-        <form method="POST">
-            <input type="password" name="password" placeholder="Password Admin" required style="width: 100%;">
-            <button type="submit" style="width: 100%;">Accedi</button>
-        </form>
-    </div>
-    {% else %}
+    <header>
+        <h1>Pannello Amministrazione MyClothes</h1>
+        <a href="{{ url_for('logout_admin') }}">Logout Admin</a>
+    </header>
 
-    <div class="card">
-        <h3>Ordini Ricevuti (Verificati automaticamente via PayPal)</h3>
-        <table>
-            <tr>
-                <th>ID Ordine</th>
-                <th>Utente</th>
-                <th>ID PayPal</th>
-                <th>Importo</th>
-                <th>Stato</th>
-                <th>Data</th>
-            </tr>
-            {% for o in ordini %}
-            <tr>
-                <td>{{ o.id }}</td>
-                <td>{{ o.username }}</td>
-                <td>{{ o.paypal_order_id }}</td>
-                <td>{{ o.importo }} €</td>
-                <td><b style="color: green;">{{ o.stato }}</b></td>
-                <td>{{ o.data_ordine }}</td>
-            </tr>
-            {% endfor %}
-        </table>
+    <div class="section">
+        <h2>Gestione Ordini Ricevuti (Pagamenti Verificati PayPal)</h2>
+        <div id="ordini-container">
+            <p>Caricamento dati in corso...</p>
+        </div>
     </div>
 
-    <div class="card">
-        <h3>Account Registrati</h3>
-        <ul>
-            {% for u in utenti %}
-            <li>ID: {{ u.id }} - Username: <b>{{ u.username }}</b></li>
-            {% endfor %}
-        </ul>
+    <div class="section">
+        <h2>Utenti Registrati</h2>
+        <div id="utenti-container">
+            <p>Caricamento utenti...</p>
+        </div>
     </div>
 
-    <div class="card">
-        <h3>Ultimi Visitatori Anonimi Tracciati</h3>
-        <table>
-            <tr>
-                <th>IP</th>
-                <th>Dispositivo (User-Agent)</th>
-                <th>Data Visita</th>
-            </tr>
-            {% for v in visitatori %}
-            <tr>
-                <td>{{ v.ip }}</td>
-                <td>{{ v.user_agent }}</td>
-                <td>{{ v.data_visita }}</td>
-            </tr>
-            {% endfor %}
-        </table>
-    </div>
+    <script>
+        function caricaDatiAdmin() {
+            fetch('/api/admin/dati')
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'error') {
+                    window.location.href = '/admin';
+                    return;
+                }
 
-    {% endif %}
+                // Genera tabella ordini
+                let htmlOrdini = `<table>
+                    <tr>
+                        <th>Codice</th>
+                        <th>Email Cliente</th>
+                        <th>Prodotto</th>
+                        <th>Importo</th>
+                        <th>Stato</th>
+                    </tr>`;
+                
+                data.tutti_ordini.forEach(o => {
+                    htmlOrdini += `<tr>
+                        <td><b>${o.codice}</b></td>
+                        <td>${o.email}</td>
+                        <td>${o.prodotto}</td>
+                        <td>${o.importo} €</td>
+                        <td><span style="color: green; font-weight: bold;">${o.stato}</span></td>
+                    </tr>`;
+                });
+                htmlOrdini += `</table>`;
+                document.getElementById('ordini-container').innerHTML = htmlOrdini;
+
+                // Genera tabella utenti
+                let htmlUtenti = `<ul>`;
+                data.lista_utenti.forEach(u => {
+                    htmlUtenti += `<li><b>Email:</b> ${u.email} | <b>Data Registrazione:</b> ${u.data}</li>`;
+                });
+                htmlUtenti += `</ul>`;
+                document.getElementById('utenti-container').innerHTML = htmlUtenti;
+            });
+        }
+
+        caricaDatiAdmin();
+    </script>
 </body>
 </html>
