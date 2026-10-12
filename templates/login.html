@@ -2,30 +2,29 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Login Admin - MyClothes</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <title>Login - MyClothes</title>
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #0f172a; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .login-box { background: white; padding: 40px; border-radius: 20px; width: 100%; max-width: 380px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); text-align: center; }
-        h2 { margin-bottom: 20px; color: #0f172a; font-weight: 700; }
-        input { width: 100%; padding: 14px; border: 2px solid #e2e8f0; border-radius: 10px; margin-bottom: 15px; font-size: 1rem; box-sizing: border-box; outline: none; }
-        input:focus { border-color: #6366f1; }
-        .btn { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); color: white; border: none; padding: 14px; width: 100%; border-radius: 10px; cursor: pointer; font-weight: 600; }
-        .error { color: #ef4444; background: #fef2f2; border: 1px solid #fecaca; padding: 10px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 15px; font-weight: 600; }
-        .back { display: block; margin-top: 15px; color: #64748b; text-decoration: none; font-size: 0.9rem; }
+        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; margin: 0; }
+        .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 300px; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; background: #0070ba; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #005ea6; }
+        .error { color: red; font-size: 14px; text-align: center; }
+        a { display: block; text-align: center; margin-top: 15px; color: #0070ba; text-decoration: none; }
     </style>
 </head>
 <body>
-    <div class="login-box">
-        <h2>🔒 Area Riservata Amministrazione</h2>
+    <div class="card">
+        <h2 style="text-align: center;">Accedi / Registrati</h2>
         {% if errore %}
-            <p class="error">⚠️ Password errata!</p>
+            <p class="error">{{ errore }}</p>
         {% endif %}
         <form method="POST">
-            <input type="password" name="password" placeholder="Inserisci Password Admin" required>
-            <button type="submit" class="btn">Accedi al Pannello Admin</button>
+            <input type="text" name="username" placeholder="Username" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Entra</button>
         </form>
-        <a href="/" class="back">← Torna al sito</a>
+        <a href="/">Torna alla home</a>
     </div>
 </body>
 </html>
