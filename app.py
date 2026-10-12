@@ -857,11 +857,12 @@ def api_admin_dati():
   ]
   email_per_uid = {ur[2]: ur[0] for ur in user_rows}
 
+  # Limite agli ultimi 10 visitatori
   execute_query(
       cursor,
       (
           "SELECT user_id, user_agent, ip_address, ultimo_accesso FROM"
-          " visitatori ORDER BY ultimo_accesso DESC"
+          " visitatori ORDER BY ultimo_accesso DESC LIMIT 10"
       ),
   )
   visitatori_rows = cursor.fetchall()
