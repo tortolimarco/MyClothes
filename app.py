@@ -17,30 +17,39 @@ app.secret_key = "chiave_segreta_super_sicura_myclothes"
 ADMIN_PASSWORD = "myclothesadmin!"
 DB_NAME = "myclothes.db"
 
-# Controllo se siamo su Render tramite la variabile DATABASE_URL di Neon
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 if DATABASE_URL:
   import psycopg2
-  import psycopg2.extras
+  import psycopg2.pool
+
+  # Creiamo un pool di connessioni globale per evitare di riconnettersi da zero a ogni richiesta!
+  db_pool = psycopg2.pool.SimpleConnectionPool(
+      1, 10, DATABASE_URL, sslmode="require"
+  )
 
 
 def get_db_connection():
   if DATABASE_URL:
-    # Connessione a PostgreSQL (Neon)
-    conn = psycopg2.connect(DATABASE_URL, sslmode="require")
-    return conn
+    return db_pool.getconn()
   else:
-    # Connessione locale SQLite
-    conn = sqlite3.connect(DB_NAME)
-    return conn
+    return sqlite3.connect(DB_NAME)
+
+
+def release_db_connection(conn):
+  if DATABASE_URL:
+    try:
+      db_pool.putconn(conn)
+    except Exception:
+      pass
+  else:
+    conn.close()
 
 
 def execute_query(cursor, query, params=None):
   if params is None:
     params = ()
   if DATABASE_URL:
-    # PostgreSQL usa %s al posto di ?
     formatted_query = query.replace("?", "%s")
     cursor.execute(formatted_query, params)
   else:
@@ -52,139 +61,125 @@ def init_db():
   conn = get_db_connection()
   cursor = conn.cursor()
 
-  if DATABASE_URL:
-    # Tabelle PostgreSQL (Neon)
-    cursor.execute("""
-            CREATE TABLE IF NOT EXISTS utenti (
-                email TEXT PRIMARY KEY,
-                password TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                data_creazione TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-    cursor.execute("""
-            CREATE TABLE IF NOT EXISTS visitatori (
-                user_id TEXT PRIMARY KEY,
-                user_agent TEXT,
-                ip_address TEXT,
-                ultimo_accesso TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-    cursor.execute("""
-            CREATE TABLE IF NOT EXISTS chat (
-                id SERIAL PRIMARY KEY,
-                user_id TEXT NOT NULL,
-                mittente TEXT NOT NULL,
-                testo TEXT,
-                immagine TEXT
-            )
-        """)
-    cursor.execute("""
-            CREATE TABLE IF NOT EXISTS ordini (
-                id TEXT PRIMARY KEY,
-                codice TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                email TEXT NOT NULL,
-                prodotto TEXT NOT NULL,
-                importo TEXT NOT NULL,
-                metodo TEXT NOT NULL,
-                stato TEXT NOT NULL,
-                motivo_annullamento TEXT,
-                nome TEXT,
-                indirizzo TEXT,
-                citta TEXT
-            )
-        """)
-    cursor.execute("""
-            CREATE TABLE IF NOT EXISTS recensioni (
-                id SERIAL PRIMARY KEY,
-                ordine_id TEXT NOT NULL,
-                codice_ordine TEXT NOT NULL,
-                email TEXT NOT NULL,
-                prodotto TEXT NOT NULL,
-                stelle INTEGER NOT NULL,
-                commento TEXT,
-                immagine TEXT,
-                data_creazione TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-    cursor.execute("""
-            CREATE TABLE IF NOT EXISTS contatore (
-                id INTEGER PRIMARY KEY,
-                valore INTEGER NOT NULL
-            )
-        """)
-    cursor.execute("SELECT valore FROM contatore WHERE id = 1")
-    if not cursor.fetchone():
-      cursor.execute("INSERT INTO contatore (id, valore) VALUES (1, 0)")
-  else:
-    # Tabelle SQLite originali (Locale)
-    cursor.execute("""
-            CREATE TABLE IF NOT EXISTS utenti (
-                email TEXT PRIMARY KEY,
-                password TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                data_creazione TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-    cursor.execute("""
-            CREATE TABLE IF NOT EXISTS visitatori (
-                user_id TEXT PRIMARY KEY,
-                user_agent TEXT,
-                ip_address TEXT,
-                ultimo_accesso TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-    cursor.execute("""
-            CREATE TABLE IF NOT EXISTS chat (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id TEXT NOT NULL,
-                mittente TEXT NOT NULL,
-                testo TEXT,
-                immagine TEXT
-            )
-        """)
-    cursor.execute("""
-            CREATE TABLE IF NOT EXISTS ordini (
-                id TEXT PRIMARY KEY,
-                codice TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                email TEXT NOT NULL,
-                prodotto TEXT NOT NULL,
-                importo TEXT NOT NULL,
-                metodo TEXT NOT NULL,
-                stato TEXT NOT NULL,
-                motivo_annullamento TEXT,
-                nome TEXT,
-                indirizzo TEXT,
-                citta TEXT
-            )
-        """)
-    cursor.execute("""
-            CREATE TABLE IF NOT EXISTS recensioni (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ordine_id TEXT NOT NULL,
-                codice_ordine TEXT NOT NULL,
-                email TEXT NOT NULL,
-                prodotto TEXT NOT NULL,
-                stelle INTEGER NOT NULL,
-                commento TEXT,
-                immagine TEXT,
-                data_creazione TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-    cursor.execute("""
-            CREATE TABLE IF NOT EXISTS contatore (
-                id INTEGER PRIMARY KEY,
-                valore INTEGER NOT NULL
-            )
-        """)
-    cursor.execute("SELECT valore FROM contatore WHERE id = 1")
-    if not cursor.fetchone():
-      cursor.execute("INSERT INTO contatore (id, valore) VALUES (1, 0)")
+  tables = [
+      (
+          "utenti",
+          """
+        CREATE TABLE IF NOT EXISTS utenti (
+            email TEXT PRIMARY KEY,
+            password TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            data_creazione TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """,
+      ),
+      (
+          "visitatori",
+          """
+        CREATE TABLE IF NOT EXISTS visitatori (
+            user_id TEXT PRIMARY KEY,
+            user_agent TEXT,
+            ip_address TEXT,
+            ultimo_accesso TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """,
+      ),
+      (
+          "chat",
+          (
+              """
+        CREATE TABLE IF NOT EXISTS chat (
+            id SERIAL PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            mittente TEXT NOT NULL,
+            testo TEXT,
+            immagine TEXT
+        )
+    """
+              if DATABASE_URL
+              else """
+        CREATE TABLE IF NOT EXISTS chat (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            mittente TEXT NOT NULL,
+            testo TEXT,
+            immagine TEXT
+        )
+    """
+          ),
+      ),
+      (
+          "ordini",
+          """
+        CREATE TABLE IF NOT EXISTS ordini (
+            id TEXT PRIMARY KEY,
+            codice TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            email TEXT NOT NULL,
+            prodotto TEXT NOT NULL,
+            importo TEXT NOT NULL,
+            metodo TEXT NOT NULL,
+            stato TEXT NOT NULL,
+            motivo_annullamento TEXT,
+            nome TEXT,
+            indirizzo TEXT,
+            citta TEXT
+        )
+    """,
+      ),
+      (
+          "recensioni",
+          (
+              """
+        CREATE TABLE IF NOT EXISTS recensioni (
+            id SERIAL PRIMARY KEY,
+            ordine_id TEXT NOT NULL,
+            codice_ordine TEXT NOT NULL,
+            email TEXT NOT NULL,
+            prodotto TEXT NOT NULL,
+            stelle INTEGER NOT NULL,
+            commento TEXT,
+            immagine TEXT,
+            data_creazione TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """
+              if DATABASE_URL
+              else """
+        CREATE TABLE IF NOT EXISTS recensioni (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ordine_id TEXT NOT NULL,
+            codice_ordine TEXT NOT NULL,
+            email TEXT NOT NULL,
+            prodotto TEXT NOT NULL,
+            stelle INTEGER NOT NULL,
+            commento TEXT,
+            immagine TEXT,
+            data_creazione TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """
+          ),
+      ),
+      (
+          "contatore",
+          """
+        CREATE TABLE IF NOT EXISTS contatore (
+            id INTEGER PRIMARY KEY,
+            valore INTEGER NOT NULL
+        )
+    """,
+      ),
+  ]
+
+  for name, sql in tables:
+    cursor.execute(sql)
+
+  cursor.execute("SELECT valore FROM contatore WHERE id = 1")
+  if not cursor.fetchone():
+    cursor.execute("INSERT INTO contatore (id, valore) VALUES (1, 0)")
 
   conn.commit()
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
 
 
 init_db()
@@ -201,7 +196,8 @@ def get_user_id():
     cursor = conn.cursor()
     execute_query(cursor, "SELECT user_id FROM utenti WHERE email = ?", (email,))
     row = cursor.fetchone()
-    conn.close()
+    cursor.close()
+    release_db_connection(conn)
     if row:
       uid = row[0]
       registra_visitatore(uid)
@@ -234,7 +230,8 @@ def registra_visitatore(uid):
       (uid, user_agent, ip_address),
   )
   conn.commit()
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
 
 
 @app.route("/")
@@ -246,20 +243,16 @@ def home():
   active_tab = session.pop("active_tab", "login")
 
   conn = get_db_connection()
-  # Se usiamo psycopg2, dict_row o fetchtuple. Gestiamo con tuple standard.
-  if DATABASE_URL:
-    cursor = conn.cursor()
-  else:
-    cursor = conn.cursor()
+  cursor = conn.cursor()
 
   execute_query(
       cursor,
       "SELECT mittente, testo, immagine FROM chat WHERE user_id = ?",
       (uid,),
   )
-  chat_rows = cursor.fetchall()
   chat_utente = [
-      {"mittente": r[0], "testo": r[1], "immagine": r[2]} for r in chat_rows
+      {"mittente": r[0], "testo": r[1], "immagine": r[2]}
+      for r in cursor.fetchall()
   ]
 
   execute_query(
@@ -271,7 +264,6 @@ def home():
       ),
       (uid,),
   )
-  ord_rows = cursor.fetchall()
   ordini_utente = [
       {
           "id": r[0],
@@ -285,7 +277,7 @@ def home():
           "indirizzo": r[8],
           "citta": r[9],
       }
-      for r in ord_rows
+      for r in cursor.fetchall()
   ]
 
   execute_query(
@@ -295,7 +287,6 @@ def home():
           " FROM recensioni ORDER BY id DESC"
       ),
   )
-  rec_rows = cursor.fetchall()
   tutte_recensioni = [
       {
           "codice_ordine": r[0],
@@ -305,10 +296,11 @@ def home():
           "commento": r[4],
           "immagine": r[5],
       }
-      for r in rec_rows
+      for r in cursor.fetchall()
   ]
 
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
 
   return render_template(
       "index.html",
@@ -339,7 +331,8 @@ def login_utente():
       cursor, "SELECT password, user_id FROM utenti WHERE email = ?", (email,)
   )
   row = cursor.fetchone()
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
 
   if not row:
     session["auth_error"] = "Account non trovato. Registrati prima!"
@@ -376,7 +369,8 @@ def registra_utente():
   cursor = conn.cursor()
   execute_query(cursor, "SELECT email FROM utenti WHERE email = ?", (email,))
   if cursor.fetchone():
-    conn.close()
+    cursor.close()
+    release_db_connection(conn)
     session["auth_error"] = "Questa email è già registrata! Effettua il login."
     session["active_tab"] = "register"
     return redirect(url_for("home"))
@@ -388,7 +382,8 @@ def registra_utente():
       (email, password, user_id),
   )
   conn.commit()
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
 
   session["user_email"] = email
   session["user_id"] = user_id
@@ -418,7 +413,8 @@ def login_google():
 
   if row:
     if row[0] != password:
-      conn.close()
+      cursor.close()
+      release_db_connection(conn)
       return (
           jsonify({
               "status": "error",
@@ -436,7 +432,8 @@ def login_google():
     )
     conn.commit()
 
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
   session["user_email"] = email
   session["user_id"] = user_id
   return jsonify({"status": "success"})
@@ -468,7 +465,8 @@ def invia():
         (uid, "cliente", testo, immagine),
     )
     conn.commit()
-    conn.close()
+    cursor.close()
+    release_db_connection(conn)
   return jsonify({"status": "success"})
 
 
@@ -483,7 +481,8 @@ def api_chat_utente():
       (uid,),
   )
   rows = cursor.fetchall()
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
   return jsonify(
       [{"mittente": r[0], "testo": r[1], "immagine": r[2]} for r in rows]
   )
@@ -504,7 +503,8 @@ def api_ordini_utente():
       (uid,),
   )
   rows = cursor.fetchall()
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
   return jsonify([
       {
           "id": r[0],
@@ -569,7 +569,8 @@ def registra_pagamento():
   )
 
   conn.commit()
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
 
   return jsonify({"status": "success"})
 
@@ -591,7 +592,8 @@ def salva_spedizione(ordine_id):
       (nome, indirizzo, citta, ordine_id),
   )
   conn.commit()
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
 
   return redirect(url_for("home"))
 
@@ -609,7 +611,8 @@ def elimina_ordine_cliente(ordine_id):
       (ordine_id,),
   )
   conn.commit()
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
 
   return redirect(url_for("home"))
 
@@ -647,10 +650,12 @@ def invia_recensione(ordine_id):
         (ordine_id, codice_ordine, email, prodotto, stelle, commento, immagine),
     )
     conn.commit()
-    conn.close()
+    cursor.close()
+    release_db_connection(conn)
     return jsonify({"status": "success"})
 
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
   return (
       jsonify({
           "status": "error",
@@ -698,7 +703,8 @@ def conferma_pagamento(ordine_id):
       (ordine_id,),
   )
   conn.commit()
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
 
   return redirect(url_for("admin"))
 
@@ -720,7 +726,8 @@ def annulla_ordine(ordine_id):
       (motivo, ordine_id),
   )
   conn.commit()
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
 
   return redirect(url_for("admin"))
 
@@ -739,7 +746,8 @@ def aggiorna_stato(ordine_id):
       (nuovo_stato, ordine_id),
   )
   conn.commit()
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
 
   return redirect(url_for("admin"))
 
@@ -760,7 +768,8 @@ def archivia_ordine(ordine_id):
       (ordine_id,),
   )
   conn.commit()
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
 
   return redirect(url_for("admin"))
 
@@ -774,7 +783,8 @@ def elimina_recensione(rec_id):
   cursor = conn.cursor()
   execute_query(cursor, "DELETE FROM recensioni WHERE id = ?", (rec_id,))
   conn.commit()
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
 
   return redirect(url_for("admin"))
 
@@ -798,7 +808,6 @@ def api_admin_dati():
 
   tutti_ordini = []
   archivio_ordini = []
-
   for r in rows:
     ord_obj = {
         "id": r[0],
@@ -853,7 +862,6 @@ def api_admin_dati():
       ),
   )
   visitatori_rows = cursor.fetchall()
-
   registered_uids = {ur[2] for ur in user_rows}
 
   visitatori_non_registrati = []
@@ -889,7 +897,8 @@ def api_admin_dati():
       for r in rec_rows
   ]
 
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
 
   return jsonify({
       "tutti_ordini": tutti_ordini,
@@ -914,7 +923,8 @@ def api_admin_get_chat(user_id):
       (user_id,),
   )
   rows = cursor.fetchall()
-  conn.close()
+  cursor.close()
+  release_db_connection(conn)
   return jsonify(
       [{"mittente": r[0], "testo": r[1], "immagine": r[2]} for r in rows]
   )
@@ -940,7 +950,8 @@ def api_admin_rispondi(user_id):
         (user_id, "admin", testo_risposta, ""),
     )
     conn.commit()
-    conn.close()
+    cursor.close()
+    release_db_connection(conn)
     return jsonify({"status": "success"})
   return jsonify({"status": "empty"}), 400
 
