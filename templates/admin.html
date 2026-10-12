@@ -26,20 +26,30 @@
         .btn-danger { background: #ef4444; }
         .btn-archive { background: #64748b; }
 
+        .badge-status { padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; display: inline-block; }
+        .badge-registered { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+        .badge-unregistered { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
         .whatsapp-container { display: flex; height: 550px; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background: #f8fafc; }
         .chat-sidebar { width: 320px; background: white; border-right: 1px solid #e2e8f0; overflow-y: auto; }
         .chat-contact { padding: 15px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background 0.2s; }
         .chat-contact:hover, .chat-contact.active { background: #e0e7ff; }
         .chat-contact-title { font-weight: 700; font-size: 0.9rem; color: #0f172a; word-break: break-all; }
-        .chat-contact-sub { font-size: 0.8rem; color: #64748b; margin-top: 3px; }
+        .chat-contact-sub { font-size: 0.8rem; color: #64748b; margin-top: 3px; word-break: break-all; }
         
         .chat-main-area { flex: 1; display: flex; flex-direction: column; background: #efeae2; position: relative; }
+        .chat-header-bar { padding: 10px 20px; background: white; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
         .chat-messages-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-        .wa-bubble { padding: 10px 14px; border-radius: 12px; max-width: 70%; font-size: 0.9rem; position: relative; word-break: break-word; }
+        
+        .wa-bubble { padding: 10px 14px; border-radius: 12px; max-width: 75%; font-size: 0.9rem; position: relative; word-break: break-word; }
         .wa-bubble.cliente { background: white; color: #111; align-self: flex-start; border-top-left-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
         .wa-bubble.admin { background: #d9fdd3; color: #111; align-self: flex-end; border-top-right-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
         .wa-bubble img { max-width: 180px; border-radius: 8px; margin-top: 6px; display: block; }
         
+        .msg-actions { margin-top: 6px; font-size: 0.75rem; display: flex; gap: 10px; opacity: 0.8; }
+        .msg-actions span { cursor: pointer; text-decoration: underline; }
+        .msg-actions span:hover { font-weight: bold; }
+
         .chat-input-bar { padding: 15px; background: #f0f2f5; display: flex; gap: 10px; align-items: center; border-top: 1px solid #e2e8f0; }
         .chat-input-bar input { flex: 1; padding: 12px 16px; border: 1px solid #cbd5e1; border-radius: 20px; outline: none; font-size: 0.95rem; background: white; }
         .no-chat-selected { display: flex; align-items: center; justify-content: center; height: 100%; color: #94a3b8; font-style: italic; }
@@ -77,7 +87,7 @@
 
         <div id="sec-chat-clienti" class="admin-section">
             <h2>💬 Chat Private con i Clienti</h2>
-            <p style="margin-bottom: 20px; color: #64748b;">Seleziona un cliente dalla lista per aprire la chat unita.</p>
+            <p style="margin-bottom: 20px; color: #64748b;">Seleziona un cliente per chattare, modificare messaggi o svuotare la conversazione.</p>
             
             <div class="whatsapp-container">
                 <div class="chat-sidebar" id="adminChatSidebar"></div>
@@ -88,6 +98,10 @@
                     </div>
 
                     <div id="active-chat-pane" style="display: none; height: 100%; flex-direction: column;">
+                        <div class="chat-header-bar">
+                            <span id="currentChatTitle" style="font-weight: 800; font-size: 0.95rem; color: #0f172a;"></span>
+                            <button type="button" class="btn btn-danger" style="padding: 5px 10px; font-size: 0.75rem;" onclick="svuotaChatCorrente()">🗑️ Svuota Intera Chat</button>
+                        </div>
                         <div class="chat-messages-box" id="adminChatMessages"></div>
                         <div class="chat-input-bar">
                             <input type="text" id="adminInputRisposta" placeholder="Scrivi un messaggio..." autocomplete="off" onkeypress="handleAdminKeypress(event)">
@@ -102,10 +116,10 @@
             <h2>👥 Registro Utenti Registrati e Visitatori</h2>
             <p style="margin-bottom: 20px; color: #64748b;">Monitora gli account con credenziali e gli ultimi dispositivi arrivati sul sito.</p>
             
-            <h3 style="font-size: 1.2rem; color: #0f172a; margin-top: 20px; margin-bottom: 10px;">✨ Account Registrati (Email e Password)</h3>
+            <h3 style="font-size: 1.2rem; color: #0f172a; margin-top: 20px; margin-bottom: 10px;">✨ Account Registrati</h3>
             <div id="adminUtentiContainer"></div>
 
-            <h3 style="font-size: 1.2rem; color: #0f172a; margin-top: 30px; margin-bottom: 10px;">🌐 Ultimi 10 Dispositivi sul Sito (Senza Registrazione)</h3>
+            <h3 style="font-size: 1.2rem; color: #0f172a; margin-top: 30px; margin-bottom: 10px;">🌐 Ultimi 10 Dispositivi sul Sito</h3>
             <div id="adminVisitatoriContainer"></div>
         </div>
 
@@ -119,6 +133,19 @@
 
     <script>
         let currentSelectedUserId = null;
+
+        function formattaData(dataStr) {
+            if(!dataStr) return 'N/D';
+            const d = new Date(dataStr);
+            if(isNaN(d.getTime())) return dataStr.split('.')[0]; 
+            const giorno = String(d.getDate()).padStart(2, '0');
+            const mese = String(d.getMonth() + 1).padStart(2, '0');
+            const anno = d.getFullYear();
+            const ore = String(d.getHours()).padStart(2, '0');
+            const minuti = String(d.getMinutes()).padStart(2, '0');
+            const secondi = String(d.getSeconds()).padStart(2, '0');
+            return `${giorno}/${mese}/${anno} ore ${ore}:${minuti}:${secondi}`;
+        }
 
         document.addEventListener("DOMContentLoaded", function() {
             aggiornaDatiAdmin();
@@ -134,10 +161,7 @@
 
         function aggiornaDatiAdmin() {
             fetch('/api/admin/dati')
-            .then(res => {
-                if(!res.ok) return;
-                return res.json();
-            })
+            .then(res => { if(!res.ok) return; return res.json(); })
             .then(data => {
                 if(!data) return;
 
@@ -218,7 +242,7 @@
                         let activeClass = currentSelectedUserId === userId ? 'active' : '';
                         sidebarHtml += `<div class="chat-contact ${activeClass}" id="contact-${userId}" onclick="selezionaChat('${userId}', '${emailCli}')">
                             <div class="chat-contact-title">👤 ${emailCli}</div>
-                            <div class="chat-contact-sub">ID: ${userId.substring(0, 8)}...</div>
+                            <div class="chat-contact-sub">ID: ${userId}</div>
                         </div>`;
                     }
                     sidebar.innerHTML = sidebarHtml;
@@ -226,32 +250,40 @@
 
                 const utentiContainer = document.getElementById('adminUtentiContainer');
                 if(data.lista_utenti.length === 0) {
-                    utentiContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun account con email registrato finora.</p>';
+                    utentiContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun account registrato finora.</p>';
                 } else {
                     let utentiHtml = '';
                     data.lista_utenti.forEach(u => {
                         utentiHtml += `<div class="user-admin-card">
                             <p style="font-weight: 800; color: #6366f1; font-size: 1.1rem;">✉️ Email: ${u.email}</p>
                             <p><strong>🔒 Password:</strong> ${u.password}</p>
-                            <p style="font-size: 0.8rem; color: #64748b;">ID Utente: ${u.user_id} | Registrato il: ${u.data}</p>
+                            <p style="font-size: 0.85rem; color: #334155; font-family: monospace;">🆔 ID Completo: <strong>${u.user_id}</strong></p>
+                            <p style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">🕒 Data Creazione: ${formattaData(u.data)}</p>
                         </div>`;
                     });
                     utentiContainer.innerHTML = utentiHtml;
                 }
 
-                // Gestione semplificata per max 10 visitatori anonimi
                 const visitatoriContainer = document.getElementById('adminVisitatoriContainer');
                 if(data.visitatori_non_registrati.length === 0) {
-                    visitatoriContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun visitatore recente.</p>';
+                    visitatoriContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun dispositivo recente.</p>';
                 } else {
                     let visHtml = '';
                     data.visitatori_non_registrati.forEach(v => {
                         let isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(v.user_agent);
                         let tipoDispositivo = isMobile ? '📱 Telefono / Mobile' : '💻 Computer / Desktop';
+                        
+                        let statusBadge = v.registrato 
+                            ? `<span class="badge-status badge-registered">🟢 Registrato (${v.email})</span>`
+                            : `<span class="badge-status badge-unregistered">🔴 Non Registrato</span>`;
 
                         visHtml += `<div class="user-admin-card" style="background: #fffbeb; border-color: #fde68a;">
-                            <p style="font-weight: 800; color: #b45309; font-size: 1.05rem;">${tipoDispositivo}</p>
-                            <p style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">🕒 Ultimo accesso: ${v.ultimo_accesso}</p>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span style="font-weight: 800; color: #b45309; font-size: 1.05rem;">${tipoDispositivo}</span>
+                                ${statusBadge}
+                            </div>
+                            <p style="font-size: 0.85rem; color: #334155; font-family: monospace;">🆔 ID Dispositivo: <strong>${v.user_id}</strong></p>
+                            <p style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">🕒 Ultimo accesso: <strong>${formattaData(v.ultimo_accesso)}</strong></p>
                         </div>`;
                     });
                     visitatoriContainer.innerHTML = visHtml;
@@ -288,6 +320,7 @@
             currentSelectedUserId = userId;
             document.getElementById('no-chat-box').style.display = 'none';
             document.getElementById('active-chat-pane').style.display = 'flex';
+            document.getElementById('currentChatTitle').innerText = 'Chat con: ' + email + ' (' + userId + ')';
             
             document.querySelectorAll('.chat-contact').forEach(c => c.classList.remove('active'));
             const contactCard = document.getElementById('contact-' + userId);
@@ -309,13 +342,58 @@
                 data.forEach(m => {
                     let mittenteLabel = m.mittente === 'admin' ? '<strong style="display:block; font-size:0.75rem; color:#059669; margin-bottom:2px;">Tu (Admin)</strong>' : '<strong style="display:block; font-size:0.75rem; color:#6366f1; margin-bottom:2px;">Cliente</strong>';
                     let imgTag = m.immagine ? `<br><img src="${m.immagine}" alt="Foto">` : '';
-                    html += `<div class="wa-bubble ${m.mittente}">${mittenteLabel}${m.testo}${imgTag}</div>`;
+                    
+                    html += `<div class="wa-bubble ${m.mittente}">
+                        ${mittenteLabel}
+                        <span id="msg-text-${m.id}">${m.testo}</span>
+                        ${imgTag}
+                        <div class="msg-actions">
+                            <span onclick="modificaMessaggioAdmin(${m.id})">✏️ Modifica</span>
+                            <span onclick="eliminaMessaggioAdmin(${m.id})">🗑️ Elimina</span>
+                        </div>
+                    </div>`;
                 });
 
                 const eraInFondo = msgBox.scrollHeight - msgBox.scrollTop <= msgBox.clientHeight + 50;
                 msgBox.innerHTML = html;
-                if(eraInFondo) {
-                    msgBox.scrollTop = msgBox.scrollHeight;
+                if(eraInFondo) { msgBox.scrollTop = msgBox.scrollHeight; }
+            });
+        }
+
+        function modificaMessaggioAdmin(msgId) {
+            const vecchioTesto = document.getElementById('msg-text-' + msgId).innerText;
+            const nuovoTesto = prompt("Modifica il tuo messaggio:", vecchioTesto);
+            if(!nuovoTesto || nuovoTesto.trim() === '') return;
+
+            fetch('/api/chat/modifica/' + msgId, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ testo: nuovoTesto.trim() })
+            }).then(res => {
+                if(res.ok) caricaMessaggiAdminCorrente();
+            });
+        }
+
+        function eliminaMessaggioAdmin(msgId) {
+            if(!confirm("Vuoi davvero eliminare questo messaggio?")) return;
+
+            fetch('/api/chat/elimina/' + msgId, {
+                method: 'POST'
+            }).then(res => {
+                if(res.ok) caricaMessaggiAdminCorrente();
+            });
+        }
+
+        function svuotaChatCorrente() {
+            if(!currentSelectedUserId) return;
+            if(!confirm("Sei sicuro di voler SVUOTARE e cancellare tutti i messaggi di questa chat?")) return;
+
+            fetch('/api/admin/chat/svuota/' + currentSelectedUserId, {
+                method: 'POST'
+            }).then(res => {
+                if(res.ok) {
+                    caricaMessaggiAdminCorrente();
+                    aggiornaDatiAdmin();
                 }
             });
         }
