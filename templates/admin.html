@@ -100,12 +100,12 @@
 
         <div id="sec-utenti-registrati" class="admin-section">
             <h2>👥 Registro Utenti Registrati e Visitatori</h2>
-            <p style="margin-bottom: 20px; color: #64748b;">Monitora gli account con credenziali e gli utenti che visitano il sito senza registrazione.</p>
+            <p style="margin-bottom: 20px; color: #64748b;">Monitora gli account con credenziali e gli ultimi dispositivi arrivati sul sito.</p>
             
             <h3 style="font-size: 1.2rem; color: #0f172a; margin-top: 20px; margin-bottom: 10px;">✨ Account Registrati (Email e Password)</h3>
             <div id="adminUtentiContainer"></div>
 
-            <h3 style="font-size: 1.2rem; color: #0f172a; margin-top: 30px; margin-bottom: 10px;">🌐 Visitatori / Utenti non registrati (Solo accesso al sito)</h3>
+            <h3 style="font-size: 1.2rem; color: #0f172a; margin-top: 30px; margin-bottom: 10px;">🌐 Ultimi 10 Dispositivi sul Sito (Senza Registrazione)</h3>
             <div id="adminVisitatoriContainer"></div>
         </div>
 
@@ -122,7 +122,6 @@
 
         document.addEventListener("DOMContentLoaded", function() {
             aggiornaDatiAdmin();
-            // Frequenza ottimizzata a 8 secondi per salvaguardare le performance cloud
             setInterval(aggiornaDatiAdmin, 8000);
         });
 
@@ -240,17 +239,19 @@
                     utentiContainer.innerHTML = utentiHtml;
                 }
 
+                // Gestione semplificata per max 10 visitatori anonimi
                 const visitatoriContainer = document.getElementById('adminVisitatoriContainer');
                 if(data.visitatori_non_registrati.length === 0) {
-                    visitatoriContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun visitatore anonimo recente.</p>';
+                    visitatoriContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun visitatore recente.</p>';
                 } else {
                     let visHtml = '';
                     data.visitatori_non_registrati.forEach(v => {
+                        let isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(v.user_agent);
+                        let tipoDispositivo = isMobile ? '📱 Telefono / Mobile' : '💻 Computer / Desktop';
+
                         visHtml += `<div class="user-admin-card" style="background: #fffbeb; border-color: #fde68a;">
-                            <p style="font-weight: 700; color: #b45309;">🌐 Visitatore / Utente Senza Account</p>
-                            <p><strong>💻 Dispositivo (Browser/OS):</strong> ${v.user_agent}</p>
-                            <p><strong>🌍 Indirizzo IP:</strong> ${v.ip}</p>
-                            <p style="font-size: 0.8rem; color: #64748b;">ID Sessione: ${v.user_id} | Ultimo accesso: ${v.ultimo_accesso}</p>
+                            <p style="font-weight: 800; color: #b45309; font-size: 1.05rem;">${tipoDispositivo}</p>
+                            <p style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">🕒 Ultimo accesso: ${v.ultimo_accesso}</p>
                         </div>`;
                     });
                     visitatoriContainer.innerHTML = visHtml;
