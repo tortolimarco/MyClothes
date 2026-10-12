@@ -63,21 +63,18 @@
             <button type="button" class="admin-nav-btn" onclick="mostraSezioneAdmin('recensioni-clienti', this)">⭐ Recensioni</button>
         </div>
 
-        <!-- SEZIONE ORDINI ATTIVI -->
         <div id="sec-ordini-attivi" class="admin-section active">
             <h2>Gestione Ordini in Corso</h2>
             <p style="margin-bottom: 20px; color: #64748b;">Verifica i pagamenti, aggiorna le spedizioni o annulla gli ordini.</p>
             <div id="adminOrdiniAttiviContainer"></div>
         </div>
 
-        <!-- SEZIONE ORDINI ARCHIVIATI -->
         <div id="sec-ordini-archiviati" class="admin-section">
             <h2>📁 Archivio Ordini</h2>
             <p style="margin-bottom: 20px; color: #64748b;">Storico separato degli ordini completati o annullati.</p>
             <div id="adminOrdiniArchiviatiContainer"></div>
         </div>
 
-        <!-- SEZIONE CHAT CLIENTE -->
         <div id="sec-chat-clienti" class="admin-section">
             <h2>💬 Chat Private con i Clienti</h2>
             <p style="margin-bottom: 20px; color: #64748b;">Seleziona un cliente dalla lista per aprire la chat unita.</p>
@@ -101,7 +98,6 @@
             </div>
         </div>
 
-        <!-- SEZIONE UTENTI & VISITATORI -->
         <div id="sec-utenti-registrati" class="admin-section">
             <h2>👥 Registro Utenti Registrati e Visitatori</h2>
             <p style="margin-bottom: 20px; color: #64748b;">Monitora gli account con credenziali e gli utenti che visitano il sito senza registrazione.</p>
@@ -113,7 +109,6 @@
             <div id="adminVisitatoriContainer"></div>
         </div>
 
-        <!-- SEZIONE RECENSIONI -->
         <div id="sec-recensioni-clienti" class="admin-section">
             <h2>⭐ Gestione Recensioni Pubblicate</h2>
             <p style="margin-bottom: 20px; color: #64748b;">Rimuovi eventuali recensioni inappropriate o non veritiere.</p>
@@ -127,7 +122,8 @@
 
         document.addEventListener("DOMContentLoaded", function() {
             aggiornaDatiAdmin();
-            setInterval(aggiornaDatiAdmin, 3000);
+            // Frequenza ottimizzata a 8 secondi per salvaguardare le performance cloud
+            setInterval(aggiornaDatiAdmin, 8000);
         });
 
         function mostraSezioneAdmin(idSezione, btnElement) {
@@ -146,7 +142,6 @@
             .then(data => {
                 if(!data) return;
 
-                // 1. Ordini Attivi
                 const attiviContainer = document.getElementById('adminOrdiniAttiviContainer');
                 if(data.tutti_ordini.length === 0) {
                     attiviContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun ordine attivo al momento.</p>';
@@ -196,7 +191,6 @@
                     attiviContainer.innerHTML = html;
                 }
 
-                // 2. Ordini Archiviati
                 const archiviatiContainer = document.getElementById('adminOrdiniArchiviatiContainer');
                 if(data.archivio_ordini.length === 0) {
                     archiviatiContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun ordine presente in archivio.</p>';
@@ -215,7 +209,6 @@
                     archiviatiContainer.innerHTML = htmlArch;
                 }
 
-                // 3. Sidebar Contatti Chat
                 const sidebar = document.getElementById('adminChatSidebar');
                 if(Object.keys(data.chat_per_utente).length === 0) {
                     sidebar.innerHTML = '<p style="padding: 15px; color: #94a3b8; font-style: italic;">Nessuna chat attiva.</p>';
@@ -232,7 +225,6 @@
                     sidebar.innerHTML = sidebarHtml;
                 }
 
-                // 4. Utenti Registrati
                 const utentiContainer = document.getElementById('adminUtentiContainer');
                 if(data.lista_utenti.length === 0) {
                     utentiContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun account con email registrato finora.</p>';
@@ -248,7 +240,6 @@
                     utentiContainer.innerHTML = utentiHtml;
                 }
 
-                // 5. Visitatori non registrati
                 const visitatoriContainer = document.getElementById('adminVisitatoriContainer');
                 if(data.visitatori_non_registrati.length === 0) {
                     visitatoriContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessun visitatore anonimo recente.</p>';
@@ -265,7 +256,6 @@
                     visitatoriContainer.innerHTML = visHtml;
                 }
 
-                // 6. Recensioni Clienti
                 const recensioniContainer = document.getElementById('adminRecensioniContainer');
                 if(data.lista_recensioni.length === 0) {
                     recensioniContainer.innerHTML = '<p style="color: #94a3b8; font-style: italic;">Nessuna recensione pubblicata dai clienti.</p>';
