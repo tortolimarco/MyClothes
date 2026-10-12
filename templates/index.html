@@ -101,7 +101,6 @@
 </head>
 <body>
 
-    <!-- HEADER SUPERIORE -->
     <header>
         <div class="header-logo">⚡ MyClothes</div>
         <div class="header-right">
@@ -117,7 +116,6 @@
     </header>
 
     <div class="app-container">
-        <!-- SIDEBAR A SINISTRA -->
         <sidebar>
             <div class="nav-menu">
                 <button type="button" class="nav-item active" onclick="mostraVista('home', this)">🏠 Vetrina</button>
@@ -127,10 +125,7 @@
             </div>
         </sidebar>
 
-        <!-- AREA CENTRALE -->
         <main-content>
-            
-            <!-- VISTA HOME -->
             <div id="vista-home" class="view-section active">
                 <div class="hero">
                     <h1>Qualsiasi capo desideri. 100% Affidabili.</h1>
@@ -161,9 +156,7 @@
                     </div>
                 </div>
 
-                <!-- SEZIONE RECENSIONI DEGLI ACQUIRENTI -->
                 <h2 style="font-size: 1.4rem; color: var(--primary); font-weight: 800; margin-bottom: 15px;">⭐ Recensioni dei Clienti</h2>
-                
                 {% if not tutte_recensioni %}
                     <p style="color: #94a3b8; font-style: italic;">Nessuna recensione presente al momento. Le recensioni appaiono non appena i prodotti arrivano a destinazione!</p>
                 {% else %}
@@ -185,7 +178,6 @@
                 {% endif %}
             </div>
 
-            <!-- VISTA CHAT -->
             <div id="vista-chat" class="view-section">
                 <div class="section-box">
                     <div class="section-title">💬 La tua Chat Privata</div>
@@ -219,7 +211,6 @@
                 </div>
             </div>
 
-            <!-- VISTA ORDINI -->
             <div id="vista-ordini" class="view-section">
                 <div class="section-box">
                     <div class="section-title">📦 I Miei Ordini & Stato Spedizione</div>
@@ -264,7 +255,6 @@
                                     <p style="font-size: 0.85rem; color: #64748b; margin-top:5px;">Spedizione a: {{ ord.nome }}, {{ ord.indirizzo }}, {{ ord.citta }}</p>
                                     <span class="badge badge-verificato">📌 Stato: Arrivato</span>
                                     
-                                    <!-- FORM RECENSIONE -->
                                     <div style="margin-top: 15px; background: #fff; padding: 15px; border-radius: 12px; border: 1px solid #cbd5e1;">
                                         <h4 style="font-size: 0.95rem; color: var(--primary); margin-bottom: 10px;">⭐ Lascia una recensione per questo ordine:</h4>
                                         <div class="form-group">
@@ -307,7 +297,6 @@
         </main-content>
     </div>
 
-    <!-- Modale Login / Registrazione -->
     <div class="modal" id="modalLoginUtente" style="display: {% if auth_error %}flex{% else %}none{% endif %};">
         <div class="modal-content">
             <button type="button" class="close-btn" onclick="chiudiLoginModal()">&times;</button>
@@ -340,7 +329,6 @@
         </div>
     </div>
 
-    <!-- Modale Pagamento -->
     <div class="modal" id="modalPagamento" style="display: none;">
         <div class="modal-content">
             <button type="button" class="close-btn" onclick="chiudiPagamento()">&times;</button>
@@ -361,7 +349,6 @@
         </div>
     </div>
 
-    <!-- Modale Bonifico -->
     <div class="modal" id="modalBonifico" style="display: none;">
         <div class="modal-content">
             <button type="button" class="close-btn" onclick="chiudiBonifico()">&times;</button>
@@ -402,7 +389,8 @@
                 }
             });
             scrollChatDown();
-            setInterval(aggiornaDatiClienteInTempoReale, 4000);
+            // Frequenza ottimizzata a 9 secondi per non sovraccaricare il database cloud
+            setInterval(aggiornaDatiClienteInTempoReale, 9000);
         });
 
         function scrollChatDown() {
