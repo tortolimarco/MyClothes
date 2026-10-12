@@ -1,27 +1,16 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import uuid
+import sqlite3
 import os
-import psycopg2
-import psycopg2.extras
 
 app = Flask(__name__)
 app.secret_key = "chiave_segreta_super_sicura_myclothes"
 
 ADMIN_PASSWORD = "myclothesadmin!"
-
-# Prende la connessione da Render (Supabase), altrimenti usa un fallback locale se testato in locale
-DATABASE_URL = os.environ.get("DATABASE_URL")
-
-def get_db_connection():
-    if DATABASE_URL:
-        conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor)
-    else:
-        # Fallback locale se non configurato (puoi ignorarlo se usi Supabase su Render)
-        raise RuntimeError("DATABASE_URL non configurata!")
-    return conn
+DB_NAME = "myclothes.db"
 
 def init_db():
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
     # Tabella Utenti Registrati
@@ -45,7 +34,7 @@ def init_db():
     # Tabella Chat
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS chat (
-            id SERIAL PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
             mittente TEXT NOT NULL,
             testo TEXT,
@@ -72,7 +61,7 @@ def init_db():
     # Tabella Recensioni
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS recensioni (
-            id SERIAL PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             ordine_id TEXT NOT NULL,
             codice_ordine TEXT NOT NULL,
             email TEXT NOT NULL,
@@ -95,10 +84,8 @@ def init_db():
         cursor.execute('INSERT INTO contatore (id, valore) VALUES (1, 0)')
     
     conn.commit()
-    cursor.close()
     conn.close()
 
-# Inizializza il database all'avvio
 init_db()
 
 def get_current_user():
@@ -107,11 +94,10 @@ def get_current_user():
 def get_user_id():
     if 'user_email' in session:
         email = session['user_email']
-        conn = get_db_connection()
+        conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('SELECT user_id FROM utenti WHERE email = %s', (email,))
+        cursor.execute('SELECT user_id FROM utenti WHERE email = ?', (email,))
         row = cursor.fetchone()
-        cursor.close()
         conn.close()
         if row:
             uid = row[0]
@@ -129,18 +115,17 @@ def registra_visitatore(uid):
     user_agent = request.headers.get('User-Agent', 'Dispositivo sconosciuto')
     ip_address = request.remote_addr or 'IP non disponibile'
     
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO visitatori (user_id, user_agent, ip_address, ultimo_accesso)
-        VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
-        ON CONFLICT (user_id) DO UPDATE SET 
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(user_id) DO UPDATE SET 
         ultimo_accesso = CURRENT_TIMESTAMP,
-        user_agent = EXCLUDED.user_agent,
-        ip_address = EXCLUDED.ip_address
+        user_agent = excluded.user_agent,
+        ip_address = excluded.ip_address
     ''', (uid, user_agent, ip_address))
     conn.commit()
-    cursor.close()
     conn.close()
 
 @app.route('/')
@@ -151,29 +136,28 @@ def home():
     auth_error = session.pop('auth_error', None)
     active_tab = session.pop('active_tab', 'login')
     
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
-    cursor.execute('SELECT mittente, testo, immagine FROM chat WHERE user_id = %s', (uid,))
+    cursor.execute('SELECT mittente, testo, immagine FROM chat WHERE user_id = ?', (uid,))
     chat_rows = cursor.fetchall()
-    chat_utente = [{"mittente": r['mittente'], "testo": r['testo'], "immagine": r['immagine']} for r in chat_rows]
+    chat_utente = [{"mittente": r[0], "testo": r[1], "immagine": r[2]} for r in chat_rows]
     
-    cursor.execute('SELECT id, codice, prodotto, importo, metodo, stato, motivo_annullamento, nome, indirizzo, citta FROM ordini WHERE user_id = %s', (uid,))
+    cursor.execute('SELECT id, codice, prodotto, importo, metodo, stato, motivo_annullamento, nome, indirizzo, citta FROM ordini WHERE user_id = ?', (uid,))
     ord_rows = cursor.fetchall()
     ordini_utente = [{
-        "id": r['id'], "codice": r['codice'], "prodotto": r['prodotto'], "importo": r['importo'],
-        "metodo": r['metodo'], "stato": r['stato'], "motivo_annullamento": r['motivo_annullamento'],
-        "nome": r['nome'], "indirizzo": r['indirizzo'], "citta": r['citta']
+        "id": r[0], "codice": r[1], "prodotto": r[2], "importo": r[3],
+        "metodo": r[4], "stato": r[5], "motivo_annullamento": r[6],
+        "nome": r[7], "indirizzo": r[8], "citta": r[9]
     } for r in ord_rows]
 
     cursor.execute('SELECT codice_ordine, email, prodotto, stelle, commento, immagine FROM recensioni ORDER BY id DESC')
     rec_rows = cursor.fetchall()
     tutte_recensioni = [{
-        "codice_ordine": r['codice_ordine'], "email": r['email'], "prodotto": r['prodotto'],
-        "stelle": r['stelle'], "commento": r['commento'], "immagine": r['immagine']
+        "codice_ordine": r[0], "email": r[1], "prodotto": r[2],
+        "stelle": r[3], "commento": r[4], "immagine": r[5]
     } for r in rec_rows]
     
-    cursor.close()
     conn.close()
     
     return render_template('index.html', 
@@ -194,11 +178,10 @@ def login_utente():
         session['active_tab'] = 'login'
         return redirect(url_for('home'))
         
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute('SELECT password, user_id FROM utenti WHERE email = %s', (email,))
+    cursor.execute('SELECT password, user_id FROM utenti WHERE email = ?', (email,))
     row = cursor.fetchone()
-    cursor.close()
     conn.close()
     
     if not row:
@@ -206,13 +189,13 @@ def login_utente():
         session['active_tab'] = 'login'
         return redirect(url_for('home'))
         
-    if row['password'] != password:
+    if row[0] != password:
         session['auth_error'] = "Password errata! Riprova."
         session['active_tab'] = 'login'
         return redirect(url_for('home'))
         
     session['user_email'] = email
-    session['user_id'] = row['user_id']
+    session['user_id'] = row[1]
     return redirect(url_for('home'))
 
 @app.route('/registra-utente', methods=['POST'])
@@ -231,20 +214,18 @@ def registra_utente():
         session['active_tab'] = 'register'
         return redirect(url_for('home'))
         
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute('SELECT email FROM utenti WHERE email = %s', (email,))
+    cursor.execute('SELECT email FROM utenti WHERE email = ?', (email,))
     if cursor.fetchone():
-        cursor.close()
         conn.close()
         session['auth_error'] = "Questa email è già registrata! Effettua il login."
         session['active_tab'] = 'register'
         return redirect(url_for('home'))
         
     user_id = session.get('user_id', str(uuid.uuid4()))
-    cursor.execute('INSERT INTO utenti (email, password, user_id) VALUES (%s, %s, %s)', (email, password, user_id))
+    cursor.execute('INSERT INTO utenti (email, password, user_id) VALUES (?, ?, ?)', (email, password, user_id))
     conn.commit()
-    cursor.close()
     conn.close()
     
     session['user_email'] = email
@@ -260,23 +241,21 @@ def login_google():
     if not email or not password:
         return jsonify({"status": "error", "message": "Email e password richieste."}), 400
         
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute('SELECT password, user_id FROM utenti WHERE email = %s', (email,))
+    cursor.execute('SELECT password, user_id FROM utenti WHERE email = ?', (email,))
     row = cursor.fetchone()
     
     if row:
-        if row['password'] != password:
-            cursor.close()
+        if row[0] != password:
             conn.close()
             return jsonify({"status": "error", "message": "Password errata per questo account!"}), 401
-        user_id = row['user_id']
+        user_id = row[1]
     else:
         user_id = session.get('user_id', str(uuid.uuid4()))
-        cursor.execute('INSERT INTO utenti (email, password, user_id) VALUES (%s, %s, %s)', (email, password, user_id))
+        cursor.execute('INSERT INTO utenti (email, password, user_id) VALUES (?, ?, ?)', (email, password, user_id))
         conn.commit()
         
-    cursor.close()
     conn.close()
     session['user_email'] = email
     session['user_id'] = user_id
@@ -296,38 +275,35 @@ def invia():
     immagine = data.get('immagine', '')
     
     if testo or immagine:
-        conn = get_db_connection()
+        conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('INSERT INTO chat (user_id, mittente, testo, immagine) VALUES (%s, %s, %s, %s)', (uid, 'cliente', testo, immagine))
+        cursor.execute('INSERT INTO chat (user_id, mittente, testo, immagine) VALUES (?, ?, ?, ?)', (uid, 'cliente', testo, immagine))
         conn.commit()
-        cursor.close()
         conn.close()
     return jsonify({"status": "success"})
 
 @app.route('/api/chat-utente', methods=['GET'])
 def api_chat_utente():
     uid = get_user_id()
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute('SELECT mittente, testo, immagine FROM chat WHERE user_id = %s', (uid,))
+    cursor.execute('SELECT mittente, testo, immagine FROM chat WHERE user_id = ?', (uid,))
     rows = cursor.fetchall()
-    cursor.close()
     conn.close()
-    return jsonify([{"mittente": r['mittente'], "testo": r['testo'], "immagine": r['immagine']} for r in rows])
+    return jsonify([{"mittente": r[0], "testo": r[1], "immagine": r[2]} for r in rows])
 
 @app.route('/api/ordini-utente', methods=['GET'])
 def api_ordini_utente():
     uid = get_user_id()
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute('SELECT id, codice, prodotto, importo, metodo, stato, motivo_annullamento, nome, indirizzo, citta FROM ordini WHERE user_id = %s', (uid,))
+    cursor.execute('SELECT id, codice, prodotto, importo, metodo, stato, motivo_annullamento, nome, indirizzo, citta FROM ordini WHERE user_id = ?', (uid,))
     rows = cursor.fetchall()
-    cursor.close()
     conn.close()
     return jsonify([{
-        "id": r['id'], "codice": r['codice'], "prodotto": r['prodotto'], "importo": r['importo'],
-        "metodo": r['metodo'], "stato": r['stato'], "motivo_annullamento": r['motivo_annullamento'],
-        "nome": r['nome'], "indirizzo": r['indirizzo'], "citta": r['citta']
+        "id": r[0], "codice": r[1], "prodotto": r[2], "importo": r[3],
+        "metodo": r[4], "stato": r[5], "motivo_annullamento": r[6],
+        "nome": r[7], "indirizzo": r[8], "citta": r[9]
     } for r in rows])
 
 @app.route('/registra-pagamento', methods=['POST'])
@@ -339,23 +315,22 @@ def registra_pagamento():
     email = get_current_user()
     data = request.get_json() or {}
     
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
     cursor.execute('SELECT valore FROM contatore WHERE id = 1')
-    val = cursor.fetchone()['valore'] + 1
-    cursor.execute('UPDATE contatore SET valore = %s WHERE id = 1', (val,))
+    val = cursor.fetchone()[0] + 1
+    cursor.execute('UPDATE contatore SET valore = ? WHERE id = 1', (val,))
     
     codice_ordine = f"#{val:04d}"
     ordine_id = str(uuid.uuid4())[:8]
     
     cursor.execute('''
         INSERT INTO ordini (id, codice, user_id, email, prodotto, importo, metodo, stato, motivo_annullamento, nome, indirizzo, citta)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (ordine_id, codice_ordine, uid, email, data.get('prodotto'), data.get('importo'), data.get('metodo'), 'In attesa di verifica pagamento', '', '', '', ''))
     
     conn.commit()
-    cursor.close()
     conn.close()
     
     return jsonify({"status": "success"})
@@ -366,22 +341,20 @@ def salva_spedizione(ordine_id):
     indirizzo = request.form.get('indirizzo')
     citta = request.form.get('citta')
     
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute('UPDATE ordini SET nome = %s, indirizzo = %s, citta = %s, stato = "In elaborazione" WHERE id = %s', (nome, indirizzo, citta, ordine_id))
+    cursor.execute('UPDATE ordini SET nome = ?, indirizzo = ?, citta = ?, stato = "In elaborazione" WHERE id = ?', (nome, indirizzo, citta, ordine_id))
     conn.commit()
-    cursor.close()
     conn.close()
     
     return redirect(url_for('home'))
 
 @app.route('/elimina-ordine-cliente/<ordine_id>', methods=['POST'])
 def elimina_ordine_cliente(ordine_id):
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM ordini WHERE id = %s AND (stato = "Arrivato" OR stato = "Annullato")', (ordine_id,))
+    cursor.execute('DELETE FROM ordini WHERE id = ? AND (stato = "Arrivato" OR stato = "Annullato")', (ordine_id,))
     conn.commit()
-    cursor.close()
     conn.close()
     
     return redirect(url_for('home'))
@@ -397,25 +370,23 @@ def invia_recensione(ordine_id):
     commento = data.get('commento', '').strip()
     immagine = data.get('immagine', '')
     
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
-    cursor.execute('SELECT codice, prodotto, stato FROM ordini WHERE id = %s', (ordine_id,))
+    cursor.execute('SELECT codice, prodotto, stato FROM ordini WHERE id = ?', (ordine_id,))
     row = cursor.fetchone()
-    if row and row['stato'] == 'Arrivato':
-        codice_ordine = row['codice']
-        prodotto = row['prodotto']
+    if row and row[2] == 'Arrivato':
+        codice_ordine = row[0]
+        prodotto = row[1]
         
         cursor.execute('''
             INSERT INTO recensioni (ordine_id, codice_ordine, email, prodotto, stelle, commento, immagine)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (ordine_id, codice_ordine, email, prodotto, stelle, commento, immagine))
         conn.commit()
-        cursor.close()
         conn.close()
         return jsonify({"status": "success"})
         
-    cursor.close()
     conn.close()
     return jsonify({"status": "error", "message": "Ordine non valido o non ancora arrivato."}), 400
 
@@ -444,11 +415,10 @@ def conferma_pagamento(ordine_id):
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin'))
         
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute('UPDATE ordini SET stato = "Pagamento Verificato - Inserisci Spedizione" WHERE id = %s', (ordine_id,))
+    cursor.execute('UPDATE ordini SET stato = "Pagamento Verificato - Inserisci Spedizione" WHERE id = ?', (ordine_id,))
     conn.commit()
-    cursor.close()
     conn.close()
     
     return redirect(url_for('admin'))
@@ -459,11 +429,10 @@ def annulla_ordine(ordine_id):
         return redirect(url_for('admin'))
         
     motivo = request.form.get('motivo', 'Nessun motivo specificato.')
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute('UPDATE ordini SET stato = "Annullato", motivo_annullamento = %s WHERE id = %s', (motivo, ordine_id))
+    cursor.execute('UPDATE ordini SET stato = "Annullato", motivo_annullamento = ? WHERE id = ?', (motivo, ordine_id))
     conn.commit()
-    cursor.close()
     conn.close()
     
     return redirect(url_for('admin'))
@@ -474,11 +443,10 @@ def aggiorna_stato(ordine_id):
         return redirect(url_for('admin'))
         
     nuovo_stato = request.form.get('nuovo_stato')
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute('UPDATE ordini SET stato = %s WHERE id = %s', (nuovo_stato, ordine_id))
+    cursor.execute('UPDATE ordini SET stato = ? WHERE id = ?', (nuovo_stato, ordine_id))
     conn.commit()
-    cursor.close()
     conn.close()
     
     return redirect(url_for('admin'))
@@ -488,11 +456,10 @@ def archivia_ordine(ordine_id):
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin'))
         
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute('UPDATE ordini SET stato = "Archiviato" WHERE id = %s AND (stato = "Arrivato" OR stato = "Annullato")', (ordine_id,))
+    cursor.execute('UPDATE ordini SET stato = "Archiviato" WHERE id = ? AND (stato = "Arrivato" OR stato = "Annullato")', (ordine_id,))
     conn.commit()
-    cursor.close()
     conn.close()
     
     return redirect(url_for('admin'))
@@ -502,11 +469,10 @@ def elimina_recensione(rec_id):
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin'))
         
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM recensioni WHERE id = %s', (rec_id,))
+    cursor.execute('DELETE FROM recensioni WHERE id = ?', (rec_id,))
     conn.commit()
-    cursor.close()
     conn.close()
     
     return redirect(url_for('admin'))
@@ -516,7 +482,7 @@ def api_admin_dati():
     if not session.get('admin_logged_in'):
         return jsonify({"status": "error"}), 401
         
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
     cursor.execute('SELECT id, codice, user_id, email, prodotto, importo, metodo, stato, motivo_annullamento, nome, indirizzo, citta FROM ordini')
@@ -527,11 +493,11 @@ def api_admin_dati():
     
     for r in rows:
         ord_obj = {
-            "id": r['id'], "codice": r['codice'], "user_id": r['user_id'], "email": r['email'],
-            "prodotto": r['prodotto'], "importo": r['importo'], "metodo": r['metodo'], "stato": r['stato'],
-            "motivo_annullamento": r['motivo_annullamento'], "nome": r['nome'], "indirizzo": r['indirizzo'], "citta": r['citta']
+            "id": r[0], "codice": r[1], "user_id": r[2], "email": r[3],
+            "prodotto": r[4], "importo": r[5], "metodo": r[6], "stato": r[7],
+            "motivo_annullamento": r[8], "nome": r[9], "indirizzo": r[10], "citta": r[11]
         }
-        if r['stato'] == 'Archiviato':
+        if r[7] == 'Archiviato':
             archivio_ordini.append(ord_obj)
         else:
             tutti_ordini.append(ord_obj)
@@ -540,40 +506,42 @@ def api_admin_dati():
     chat_rows = cursor.fetchall()
     chat_per_utente = {}
     for cr in chat_rows:
-        u_id = cr['user_id']
+        u_id = cr[0]
         if u_id not in chat_per_utente:
             chat_per_utente[u_id] = []
-        chat_per_utente[u_id].append({"mittente": cr['mittente'], "testo": cr['testo'], "immagine": cr['immagine']})
+        chat_per_utente[u_id].append({"mittente": cr[1], "testo": cr[2], "immagine": cr[3]})
         
     cursor.execute('SELECT email, password, user_id, data_creazione FROM utenti')
     user_rows = cursor.fetchall()
-    lista_utenti = [{"email": ur['email'], "password": ur['password'], "user_id": ur['user_id'], "data": str(ur['data_creazione'])} for ur in user_rows]
-    email_per_uid = {ur['user_id']: ur['email'] for ur in user_rows}
+    lista_utenti = [{"email": ur[0], "password": ur[1], "user_id": ur[2], "data": ur[3]} for ur in user_rows]
+    email_per_uid = {ur[2]: ur[0] for ur in user_rows}
 
+    # Prendi tutti i visitatori/accessi non registrati o totali
     cursor.execute('SELECT user_id, user_agent, ip_address, ultimo_accesso FROM visitatori ORDER BY ultimo_accesso DESC')
     visitatori_rows = cursor.fetchall()
     
-    registered_uids = {ur['user_id'] for ur in user_rows}
+    # Mappa degli user_id registrati per riconoscerli
+    registered_uids = {ur[2] for ur in user_rows}
     
     visitatori_non_registrati = []
     for vr in visitatori_rows:
-        v_uid = vr['user_id']
+        v_uid = vr[0]
+        # Se non è un utente registrato con email, lo mettiamo tra i visitatori liberi/esterni
         if v_uid not in registered_uids:
             visitatori_non_registrati.append({
                 "user_id": v_uid,
-                "user_agent": vr['user_agent'],
-                "ip": vr['ip_address'],
-                "ultimo_accesso": str(vr['ultimo_accesso'])
+                "user_agent": vr[1],
+                "ip": vr[2],
+                "ultimo_accesso": vr[3]
             })
 
     cursor.execute('SELECT id, ordine_id, codice_ordine, email, prodotto, stelle, commento, immagine FROM recensioni ORDER BY id DESC')
     rec_rows = cursor.fetchall()
     lista_recensioni = [{
-        "id": r['id'], "ordine_id": r['ordine_id'], "codice_ordine": r['codice_ordine'], "email": r['email'],
-        "prodotto": r['prodotto'], "stelle": r['stelle'], "commento": r['commento'], "immagine": r['immagine']
+        "id": r[0], "ordine_id": r[1], "codice_ordine": r[2], "email": r[3],
+        "prodotto": r[4], "stelle": r[5], "commento": r[6], "immagine": r[7]
     } for r in rec_rows]
     
-    cursor.close()
     conn.close()
     
     return jsonify({
@@ -590,13 +558,12 @@ def api_admin_dati():
 def api_admin_get_chat(user_id):
     if not session.get('admin_logged_in'):
         return jsonify({"status": "error"}), 401
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute('SELECT mittente, testo, immagine FROM chat WHERE user_id = %s', (user_id,))
+    cursor.execute('SELECT mittente, testo, immagine FROM chat WHERE user_id = ?', (user_id,))
     rows = cursor.fetchall()
-    cursor.close()
     conn.close()
-    return jsonify([{"mittente": r['mittente'], "testo": r['testo'], "immagine": r['immagine']} for r in rows])
+    return jsonify([{"mittente": r[0], "testo": r[1], "immagine": r[2]} for r in rows])
 
 @app.route('/api/admin/rispondi/<user_id>', methods=['POST'])
 def api_admin_rispondi(user_id):
@@ -607,11 +574,10 @@ def api_admin_rispondi(user_id):
     testo_risposta = data.get('risposta', '').strip()
     
     if testo_risposta:
-        conn = get_db_connection()
+        conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('INSERT INTO chat (user_id, mittente, testo, immagine) VALUES (%s, %s, %s, %s)', (user_id, 'admin', testo_risposta, ''))
+        cursor.execute('INSERT INTO chat (user_id, mittente, testo, immagine) VALUES (?, ?, ?, ?)', (user_id, 'admin', testo_risposta, ''))
         conn.commit()
-        cursor.close()
         conn.close()
         return jsonify({"status": "success"})
     return jsonify({"status": "empty"}), 400
