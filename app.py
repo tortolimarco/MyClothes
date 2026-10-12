@@ -593,4 +593,20 @@ def api_admin_get_chat(user_id):
 @app.route('/api/admin/rispondi/<user_id>', methods=['POST'])
 def api_admin_rispondi(user_id):
     if not session.get('admin_logged_in'):
-        return jsonify({"status":
+        return jsonify({"status": "error"}), 401
+        
+    data = request.get_json() or {}
+    testo_risposta = data.get('risposta', '').strip()
+    
+    if testo_risposta:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('INSERT INTO chat (user_id, mittente, testo, immagine) VALUES (%s, %s, %s, %s)', (user_id, 'admin', testo_risposta, ''))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({"status": "success"})
+    return jsonify({"status": "empty"}), 400
+
+if __name__ == '__main__':
+    app.run(debug=True)
