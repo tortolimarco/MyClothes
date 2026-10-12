@@ -2,114 +2,156 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>MyClothes - E-commerce</title>
-    <!-- SDK di PayPal (Sostituisci il tuo client-id se necessario o usa 'test') -->
-    <script src="https://www.paypal.com/sdk/js?client-id=BAA32LPTN_t7-cB1dYo-K-fKrGDNkceZr8YyHYH35p1sU_kVQIg08vI6QcbS2JhRgwDDQKCysP34fqAVo0&currency=EUR"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyClothes - Official Store</title>
+    <!-- SDK PayPal (Inserisci il tuo Client ID reale al posto di 'sb' per la produzione) -->
+    <script src="https://www.paypal.com/sdk/js?client-id=sb&currency=EUR"></script>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f9f9f9; }
-        header { display: flex; justify-content: space-between; align-items: center; background: #333; color: white; padding: 10px 20px; }
-        header a { color: white; text-decoration: none; margin-left: 15px; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; margin-top: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .product { border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; }
-        button { background: #0070ba; color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 4px; }
-        button:hover { background: #005ea6; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; }
+        header { background-color: #111; color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; }
+        header h1 { margin: 0; font-size: 24px; letter-spacing: 2px; }
+        nav a { color: white; text-decoration: none; margin-left: 20px; font-weight: 500; }
+        .container { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 20px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
+        .card img { max-width: 100%; height: 200px; object-fit: cover; border-radius: 4px; }
+        .btn { background-color: #000; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin-top: 10px; }
+        .btn:hover { background-color: #444; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 30px; border-radius: 8px; max-width: 400px; width: 100%; position: relative; }
+        .close-btn { position: absolute; top: 10px; right: 15px; font-size: 20px; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <header>
-        <h2>MyClothes</h2>
-        <div>
-            {% if session.get('username') %}
-                <span>Benvenuto, <b>{{ session['username'] }}</b></span>
-                <a href="{{ url_for('miei_ordini') }}">I miei ordini</a>
-                <a href="{{ url_for('logout') }}">Logout</a>
+        <h1>MYCLOTHES</h1>
+        <nav>
+            {% if user_email %}
+                <span>{{ user_email }}</span>
+                <a href="{{ url_for('logout_utente') }}">Logout</a>
             {% else %}
-                <a href="{{ url_for('login') }}">Accedi / Registrati</a>
+                <a href="{{ url_for('home') }}">Accedi / Registrati</a>
             {% endif %}
-            <a href="/admin">Area Admin</a>
-        </div>
+            <a href="{{ url_for('admin') }}">Admin</a>
+        </nav>
     </header>
 
     <div class="container">
-        <h2>Catalogo Prodotti</h2>
-        
-        <div class="product">
-            <div>
-                <h3>Felpa MyClothes Classic</h3>
-                <p>Prezzo: <b>49.99 €</b></p>
+        <h2>I nostri prodotti</h2>
+        <div class="grid">
+            <div class="card">
+                <img src="https://via.placeholder.com/250x200?text=Felpa+MyClothes" alt="Felpa">
+                <h3>Felpa Oversize MyClothes</h3>
+                <p>Prezzo: <b>59.99 €</b></p>
+                <button class="btn" onclick="apriPagamento('Felpa Oversize MyClothes', '59.99')">Acquista ora</button>
             </div>
-            <button onclick="preparaCheckout(49.99, 'Felpa MyClothes Classic')">Paga con PayPal</button>
+            <div class="card">
+                <img src="https://via.placeholder.com/250x200?text=T-Shirt+MyClothes" alt="T-Shirt">
+                <h3>T-Shirt Limited Edition</h3>
+                <p>Prezzo: <b>29.99 €</b></p>
+                <button class="btn" onclick="apriPagamento('T-Shirt Limited Edition', '29.99')">Acquista ora</button>
+            </div>
         </div>
 
-        <div class="product">
-            <div>
-                <h3>T-Shirt MyClothes Summer</h3>
-                <p>Prezzo: <b>24.99 €</b></p>
-            </div>
-            <button onclick="preparaCheckout(24.99, 'T-Shirt MyClothes Summer')">Paga con PayPal</button>
+        <!-- Sezione I Miei Ordini per l'utente loggato -->
+        {% if user_email %}
+        <h2 style="margin-top: 50px;">I tuoi ordini</h2>
+        <div class="card" style="text-align: left;">
+            {% if ordini_utente %}
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #ddd;">
+                            <th style="padding: 8px;">Codice</th>
+                            <th style="padding: 8px;">Prodotto</th>
+                            <th style="padding: 8px;">Importo</th>
+                            <th style="padding: 8px;">Stato</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ord in ordini_utente %}
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 8px;"><b>{{ ord.codice }}</b></td>
+                            <td style="padding: 8px;">{{ ord.prodotto }}</td>
+                            <td style="padding: 8px;">{{ ord.importo }} €</td>
+                            <td style="padding: 8px;"><span style="color: green; font-weight: bold;">{{ ord.stato }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>Non hai ancora effettuato ordini.</p>
+            {% endif %}
         </div>
+        {% endif %}
+    </div>
 
-        <div id="checkout-section" style="margin-top: 30px; border-top: 2px solid #eee; padding-top: 20px; display:none;">
-            <h3>Completa il pagamento per: <span id="product-name"></span></h3>
-            <p>Totale: <span id="product-price"></span> €</p>
-            <!-- Contenitore del bottone PayPal ufficiale -->
-            <div id="paypal-button-container"></div>
+    <!-- Modal di Pagamento PayPal -->
+    <div id="modal-pagamento" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="chiudiPagamento()">&times;</span>
+            <h3 id="modal-titolo">Completa l'acquisto</h3>
+            <p>Prodotto: <b id="modal-prodotto"></b></p>
+            <p>Totale: <b id="modal-prezzo"></b> €</p>
+            
+            <div id="paypal-button-container" style="margin-top: 20px;"></div>
         </div>
     </div>
 
     <script>
-        let prezzoCorrente = 0;
+        let prodottoSelezionato = '';
+        let prezzoSelezionato = '';
 
-        function preparaCheckout(prezzo, nomeProdotto) {
-            {% if not session.get('user_id') %}
-                alert("Devi effettuare il login per procedere all'acquisto!");
-                window.location.href = "{{ url_for('login') }}";
+        function apriPagamento(prodotto, prezzo) {
+            {% if not user_email %}
+                alert("Per favore effettua il login prima di procedere all'acquisto!");
                 return;
             {% endif %}
 
-            prezzoCorrente = prezzo;
-            document.getElementById('product-name').innerText = nomeProdotto;
-            document.getElementById('product-price').innerText = prezzo;
-            document.getElementById('checkout-section').style.display = 'block';
-            
-            // Pulisci eventuali bottoni precedenti se l'utente cambia prodotto
+            prodottoSelezionato = prodotto;
+            prezzoSelezionato = prezzo;
+
+            document.getElementById('modal-prodotto').innerText = prodotto;
+            document.getElementById('modal-prezzo').innerText = prezzo;
+            document.getElementById('modal-pagamento').style.display = 'flex';
+
             document.getElementById('paypal-button-container').innerHTML = '';
 
-            // Renderizza il bottone PayPal
             paypal.Buttons({
                 createOrder: function(data, actions) {
                     return actions.order.create({
                         purchase_units: [{
-                            amount: {
-                                value: prezzoCorrente.toString()
-                            }
+                            amount: { value: prezzoSelezionato }
                         }]
                     });
                 },
                 onApprove: function(data, actions) {
                     return actions.order.capture().then(function(details) {
-                        // Invia la conferma al server Flask
-                        fetch('/conferma-pagamento-paypal', {
+                        fetch('/registra-pagamento', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                orderID: data.orderID,
-                                details: details
+                                paypal_order_id: data.orderID,
+                                prodotto: prodottoSelezionato,
+                                importo: prezzoSelezionato
                             })
                         })
-                        .then(response => response.json())
-                        .then(res => {
-                            if (res.success) {
-                                // REINDIRIZZAMENTO AUTOMATICO ALLA PAGINA DEGLI ORDINI
-                                window.location.href = "{{ url_for('miei_ordini') }}";
+                        .then(res => res.json())
+                        .then(resData => {
+                            if (resData.status === 'success') {
+                                alert('Pagamento completato con successo!');
+                                window.location.reload();
                             } else {
-                                alert('Errore nel salvataggio ordine: ' + res.error);
+                                alert('Errore: ' + resData.message);
                             }
                         });
                     });
                 }
             }).render('#paypal-button-container');
+        }
+
+        function chiudiPagamento() {
+            document.getElementById('modal-pagamento').style.display = 'none';
         }
     </script>
 </body>
