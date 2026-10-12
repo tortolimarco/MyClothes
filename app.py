@@ -23,7 +23,6 @@ if DATABASE_URL:
   import psycopg2
   import psycopg2.pool
 
-  # Creiamo un pool di connessioni globale per evitare di riconnettersi da zero a ogni richiesta!
   db_pool = psycopg2.pool.SimpleConnectionPool(
       1, 10, DATABASE_URL, sslmode="require"
   )
@@ -217,21 +216,25 @@ def registra_visitatore(uid):
 
   conn = get_db_connection()
   cursor = conn.cursor()
-  execute_query(
-      cursor,
-      """
-        INSERT INTO visitatori (user_id, user_agent, ip_address, ultimo_accesso)
-        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(user_id) DO UPDATE SET 
-        ultimo_accesso = CURRENT_TIMESTAMP,
-        user_agent = excluded.user_agent,
-        ip_address = excluded.ip_address
-    """,
-      (uid, user_agent, ip_address),
-  )
-  conn.commit()
-  cursor.close()
-  release_db_connection(conn)
+  try:
+    execute_query(
+        cursor,
+        """
+            INSERT INTO visitatori (user_id, user_agent, ip_address, ultimo_accesso)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id) DO UPDATE SET 
+            ultimo_accesso = CURRENT_TIMESTAMP,
+            user_agent = excluded.user_agent,
+            ip_address = excluded.ip_address
+        """,
+        (uid, user_agent, ip_address),
+    )
+    conn.commit()
+  except Exception:
+    conn.rollback()
+  finally:
+    cursor.close()
+    release_db_connection(conn)
 
 
 @app.route("/")
@@ -586,8 +589,8 @@ def salva_spedizione(ordine_id):
   execute_query(
       cursor,
       (
-          'UPDATE ordini SET nome = ?, indirizzo = ?, citta = ?, stato = "In'
-          ' elaborazione" WHERE id = ?'
+          "UPDATE ordini SET nome = ?, indirizzo = ?, citta = ?, stato = 'In"
+          " elaborazione' WHERE id = ?"
       ),
       (nome, indirizzo, citta, ordine_id),
   )
@@ -605,8 +608,8 @@ def elimina_ordine_cliente(ordine_id):
   execute_query(
       cursor,
       (
-          'DELETE FROM ordini WHERE id = ? AND (stato = "Arrivato" OR stato ='
-          ' "Annullato")'
+          "DELETE FROM ordini WHERE id = ? AND (stato = 'Arrivato' OR stato ="
+          " 'Annullato')"
       ),
       (ordine_id,),
   )
@@ -697,8 +700,8 @@ def conferma_pagamento(ordine_id):
   execute_query(
       cursor,
       (
-          'UPDATE ordini SET stato = "Pagamento Verificato - Inserisci'
-          ' Spedizione" WHERE id = ?'
+          "UPDATE ordini SET stato = 'Pagamento Verificato - Inserisci"
+          " Spedizione' WHERE id = ?"
       ),
       (ordine_id,),
   )
@@ -720,7 +723,7 @@ def annulla_ordine(ordine_id):
   execute_query(
       cursor,
       (
-          'UPDATE ordini SET stato = "Annullato", motivo_annullamento = ? WHERE'
+          "UPDATE ordini SET stato = 'Annullato', motivo_annullamento = ? WHERE"
           " id = ?"
       ),
       (motivo, ordine_id),
@@ -762,8 +765,8 @@ def archivia_ordine(ordine_id):
   execute_query(
       cursor,
       (
-          'UPDATE ordini SET stato = "Archiviato" WHERE id = ? AND (stato ='
-          ' "Arrivato" OR stato = "Annullato")'
+          "UPDATE ordini SET stato = 'Archiviato' WHERE id = ? AND (stato ="
+          " 'Arrivato' OR stato = 'Annullato')"
       ),
       (ordine_id,),
   )
