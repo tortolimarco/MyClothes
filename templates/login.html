@@ -2,29 +2,29 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Login - MyClothes</title>
+    <title>Login / Admin - MyClothes</title>
     <style>
-        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; margin: 0; }
-        .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 300px; }
-        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; background: #0070ba; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; }
-        button:hover { background: #005ea6; }
-        .error { color: red; font-size: 14px; text-align: center; }
-        a { display: block; text-align: center; margin-top: 15px; color: #0070ba; text-decoration: none; }
+        body { font-family: Arial, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 320px; }
+        h2 { text-align: center; margin-bottom: 20px; }
+        input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; background: #000; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; margin-top: 10px; }
+        button:hover { background: #333; }
+        .error { color: red; text-align: center; font-size: 14px; margin-bottom: 10px; }
+        .back-link { display: block; text-align: center; margin-top: 15px; color: #555; text-decoration: none; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h2 style="text-align: center;">Accedi / Registrati</h2>
+    <div class="box">
+        <h2>Accesso Riservato</h2>
         {% if errore %}
-            <p class="error">{{ errore }}</p>
+            <p class="error">Password non valida!</p>
         {% endif %}
         <form method="POST">
-            <input type="text" name="username" placeholder="Username" required>
-            <input type="password" name="password" placeholder="Password" required>
+            <input type="password" name="password" placeholder="Inserisci la password" required>
             <button type="submit">Entra</button>
         </form>
-        <a href="/">Torna alla home</a>
+        <a href="/" class="back-link">← Torna al sito</a>
     </div>
 </body>
 </html>
