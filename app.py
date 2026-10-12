@@ -16,6 +16,7 @@ def get_db_connection():
     if DATABASE_URL:
         conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor)
     else:
+        # Fallback locale se non configurato (puoi ignorarlo se usi Supabase su Render)
         raise RuntimeError("DATABASE_URL non configurata!")
     return conn
 
@@ -51,7 +52,7 @@ def init_db():
             immagine TEXT
         )
     ''')
-    # Tabella Ordini (Aggiornata per PayPal automatico e rimozione bonifico)
+    # Tabella Ordini
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS ordini (
             id TEXT PRIMARY KEY,
@@ -65,8 +66,7 @@ def init_db():
             motivo_annullamento TEXT,
             nome TEXT,
             indirizzo TEXT,
-            citta TEXT,
-            paypal_order_id TEXT
+            citta TEXT
         )
     ''')
     # Tabella Recensioni
@@ -330,7 +330,6 @@ def api_ordini_utente():
         "nome": r['nome'], "indirizzo": r['indirizzo'], "citta": r['citta']
     } for r in rows])
 
-# ---- NUOVA ROTTA PAYPAL AUTOMATICA ----
 @app.route('/registra-pagamento', methods=['POST'])
 def registra_pagamento():
     if not get_current_user():
@@ -339,10 +338,6 @@ def registra_pagamento():
     uid = get_user_id()
     email = get_current_user()
     data = request.get_json() or {}
-    
-    paypal_order_id = data.get('paypal_order_id')
-    prodotto = data.get('prodotto')
-    importo = data.get('importo')
     
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -354,17 +349,16 @@ def registra_pagamento():
     codice_ordine = f"#{val:04d}"
     ordine_id = str(uuid.uuid4())[:8]
     
-    # Stato impostato direttamente a "Pagato - Inserisci Spedizione" in modo automatico
     cursor.execute('''
-        INSERT INTO ordini (id, codice, user_id, email, prodotto, importo, metodo, stato, motivo_annullamento, nome, indirizzo, citta, paypal_order_id)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    ''', (ordine_id, codice_ordine, uid, email, prodotto, importo, 'PayPal (Automatico)', 'Pagato - Inserisci Spedizione', '', '', '', '', paypal_order_id))
+        INSERT INTO ordini (id, codice, user_id, email, prodotto, importo, metodo, stato, motivo_annullamento, nome, indirizzo, citta)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ''', (ordine_id, codice_ordine, uid, email, data.get('prodotto'), data.get('importo'), data.get('metodo'), 'In attesa di verifica pagamento', '', '', '', ''))
     
     conn.commit()
     cursor.close()
     conn.close()
     
-    return jsonify({"status": "success", "ordine_id": ordine_id})
+    return jsonify({"status": "success"})
 
 @app.route('/salva-spedizione/<ordine_id>', methods=['POST'])
 def salva_spedizione(ordine_id):
@@ -374,7 +368,7 @@ def salva_spedizione(ordine_id):
     
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('UPDATE ordini SET nome = %s, indirizzo = %s, citta = %s, stato = %s WHERE id = %s', (nome, indirizzo, citta, 'In elaborazione', ordine_id))
+    cursor.execute('UPDATE ordini SET nome = %s, indirizzo = %s, citta = %s, stato = "In elaborazione" WHERE id = %s', (nome, indirizzo, citta, ordine_id))
     conn.commit()
     cursor.close()
     conn.close()
@@ -385,7 +379,7 @@ def salva_spedizione(ordine_id):
 def elimina_ordine_cliente(ordine_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM ordini WHERE id = %s AND (stato = %s OR stato = %s)', (ordine_id, 'Arrivato', 'Annullato'))
+    cursor.execute('DELETE FROM ordini WHERE id = %s AND (stato = "Arrivato" OR stato = "Annullato")', (ordine_id,))
     conn.commit()
     cursor.close()
     conn.close()
@@ -445,6 +439,20 @@ def logout_admin():
     session.pop('admin_logged_in', None)
     return redirect(url_for('admin'))
 
+@app.route('/conferma-pagamento/<ordine_id>', methods=['POST'])
+def conferma_pagamento(ordine_id):
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin'))
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE ordini SET stato = "Pagamento Verificato - Inserisci Spedizione" WHERE id = %s', (ordine_id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    
+    return redirect(url_for('admin'))
+
 @app.route('/annulla-ordine/<ordine_id>', methods=['POST'])
 def annulla_ordine(ordine_id):
     if not session.get('admin_logged_in'):
@@ -453,7 +461,7 @@ def annulla_ordine(ordine_id):
     motivo = request.form.get('motivo', 'Nessun motivo specificato.')
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('UPDATE ordini SET stato = %s, motivo_annullamento = %s WHERE id = %s', ('Annullato', motivo, ordine_id))
+    cursor.execute('UPDATE ordini SET stato = "Annullato", motivo_annullamento = %s WHERE id = %s', (motivo, ordine_id))
     conn.commit()
     cursor.close()
     conn.close()
@@ -482,7 +490,7 @@ def archivia_ordine(ordine_id):
         
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('UPDATE ordini SET stato = %s WHERE id = %s AND (stato = %s OR stato = %s)', ('Archiviato', ordine_id, 'Arrivato', 'Annullato'))
+    cursor.execute('UPDATE ordini SET stato = "Archiviato" WHERE id = %s AND (stato = "Arrivato" OR stato = "Annullato")', (ordine_id,))
     conn.commit()
     cursor.close()
     conn.close()
