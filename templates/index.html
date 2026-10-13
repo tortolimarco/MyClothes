@@ -99,6 +99,19 @@
         .divider { text-align: center; border-bottom: 1px solid #e2e8f0; line-height: 0.1em; margin: 25px 0 20px; color: #94a3b8; font-size: 0.85rem; }
         .divider span { background: #fff; padding: 0 10px; }
 
+        /* Stili Modal Selezione Lingua */
+        .language-modal-content { max-width: 520px !important; text-align: center; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); border: 1px solid #e2e8f0; }
+        .language-header { margin-bottom: 25px; }
+        .lang-icon-badge { font-size: 2.2rem; background: #e0e7ff; width: 60px; height: 60px; line-height: 60px; border-radius: 50%; margin: 0 auto 12px; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15); }
+        .language-header h2 { font-size: 1.6rem; font-weight: 800; color: var(--primary); margin-bottom: 4px; }
+        .language-header p { font-size: 0.88rem; color: #64748b; }
+        .language-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .lang-card { background: white; border: 2px solid #e2e8f0; border-radius: 14px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); text-align: left; }
+        .lang-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(99, 102, 241, 0.12); background: #ffffff; }
+        .lang-card .flag { font-size: 1.8rem; line-height: 1; }
+        .lang-card .lang-name { display: block; font-weight: 700; font-size: 0.95rem; color: var(--primary); }
+        .lang-card .lang-native { display: block; font-size: 0.78rem; color: #64748b; }
+
         @media (max-width: 768px) {
             header { padding: 12px 15px; flex-direction: column; gap: 10px; text-align: center; }
             .header-right { width: 100%; justify-content: center; flex-wrap: wrap; }
@@ -107,6 +120,7 @@
             .nav-menu { flex-direction: row; flex-wrap: wrap; gap: 6px; justify-content: center; }
             .nav-item { flex: 1; min-width: 120px; justify-content: center; font-size: 0.85rem; padding: 10px; text-align: center; }
             main-content { padding: 20px; }
+            .language-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -317,6 +331,7 @@
         </main-content>
     </div>
 
+    <!-- Modal Login / Registrazione -->
     <div class="modal" id="modalLoginUtente" style="display: {% if auth_error %}flex{% else %}none{% endif %};">
         <div class="modal-content">
             <button type="button" class="close-btn" onclick="chiudiLoginModal()">&times;</button>
@@ -349,6 +364,7 @@
         </div>
     </div>
 
+    <!-- Modal Pagamento -->
     <div class="modal" id="modalPagamento" style="display: none;">
         <div class="modal-content">
             <button type="button" class="close-btn" onclick="chiudiPagamento()">&times;</button>
@@ -368,14 +384,112 @@
         </div>
     </div>
 
+    <!-- Modal Selezione Lingua (6 lingue più usate + Italiano) -->
+    <div class="modal" id="modalLingua" style="display: none;">
+        <div class="modal-content language-modal-content">
+            <div class="language-header">
+                <div class="lang-icon-badge">🌐</div>
+                <h2>Scegli la tua lingua</h2>
+                <p>Select your preferred language / 请选择您的语言</p>
+            </div>
+            
+            <div class="language-grid">
+                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('it', 'Italiano')">
+                    <span class="flag">🇮🇹</span>
+                    <div>
+                        <span class="lang-name">Italiano</span>
+                        <span class="lang-native">Italian</span>
+                    </div>
+                </button>
+                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('en', 'English')">
+                    <span class="flag">🇬🇧</span>
+                    <div>
+                        <span class="lang-name">English</span>
+                        <span class="lang-native">English</span>
+                    </div>
+                </button>
+                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('zh-CN', '中文')">
+                    <span class="flag">🇨🇳</span>
+                    <div>
+                        <span class="lang-name">Chinese</span>
+                        <span class="lang-native">中文</span>
+                    </div>
+                </button>
+                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('hi', 'Hindi')">
+                    <span class="flag">🇮🇳</span>
+                    <div>
+                        <span class="lang-name">Hindi</span>
+                        <span class="lang-native">हिन्दी</span>
+                    </div>
+                </button>
+                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('es', 'Español')">
+                    <span class="flag">🇪🇸</span>
+                    <div>
+                        <span class="lang-name">Spanish</span>
+                        <span class="lang-native">Español</span>
+                    </div>
+                </button>
+                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('fr', 'Français')">
+                    <span class="flag">🇫🇷</span>
+                    <div>
+                        <span class="lang-name">French</span>
+                        <span class="lang-native">Français</span>
+                    </div>
+                </button>
+                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('ar', 'Arabic')">
+                    <span class="flag">🇸🇦</span>
+                    <div>
+                        <span class="lang-name">Arabic</span>
+                        <span class="lang-native">العربية</span>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Google Translate & Logica Sito -->
     <script type="text/javascript">
         function googleTranslateElementInit() {
-          new google.translate.TranslateElement({pageLanguage: 'it', includedLanguages: 'en,es,fr,de,it', layout: google.translate.TranslateElement.InlineLayout.SIMPLE}, 'google_translate_element');
+            new google.translate.TranslateElement({
+                pageLanguage: 'it',
+                includedLanguages: 'it,en,zh-CN,hi,es,fr,ar',
+                layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+            }, 'google_translate_element');
         }
-    </script>
-    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
-    <script>
+        // Controllo prima visita per mostrare il modal lingua
+        document.addEventListener("DOMContentLoaded", function() {
+            const linguaSalvata = localStorage.getItem('myclothes_language_selected');
+            if (!linguaSalvata) {
+                setTimeout(() => {
+                    document.getElementById('modalLingua').style.display = 'flex';
+                }, 500);
+            }
+
+            document.querySelectorAll('.view-section').forEach(el => {
+                if(!el.classList.contains('active')) {
+                    el.style.display = 'none';
+                } else {
+                    el.style.display = 'block';
+                }
+            });
+            scrollChatDown();
+            setInterval(aggiornaDatiClienteInTempoReale, 9000);
+        });
+
+        function selezionaEImpostaLingua(codiceLingua) {
+            localStorage.setItem('myclothes_language_selected', codiceLingua);
+            document.getElementById('modalLingua').style.display = 'none';
+
+            if (codiceLingua === 'it') return;
+
+            const translateSelect = document.querySelector('#google_translate_element select');
+            if (translateSelect) {
+                translateSelect.value = codiceLingua;
+                translateSelect.dispatchEvent(new Event('change'));
+            }
+        }
+
         function mostraVista(nomeVista, elementoBtn) {
             document.querySelectorAll('.view-section').forEach(el => {
                 el.classList.remove('active');
@@ -391,18 +505,6 @@
             }
             if(elementoBtn) elementoBtn.classList.add('active');
         }
-
-        document.addEventListener("DOMContentLoaded", function() {
-            document.querySelectorAll('.view-section').forEach(el => {
-                if(!el.classList.contains('active')) {
-                    el.style.display = 'none';
-                } else {
-                    el.style.display = 'block';
-                }
-            });
-            scrollChatDown();
-            setInterval(aggiornaDatiClienteInTempoReale, 9000);
-        });
 
         function scrollChatDown() {
             const chatBox = document.getElementById('chatMessages');
@@ -627,5 +729,6 @@
             });
         }
     </script>
+    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 </body>
 </html>
