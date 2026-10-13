@@ -6,21 +6,22 @@
     <title>MyClothes - Dashboard Cliente</title>
     
     <!-- Icona Favicon del Sito -->
-   <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
 
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root { --primary: #0f172a; --accent: #6366f1; --accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); --bg: #f8fafc; --card-bg: #ffffff; --text: #334155; }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
-        body { background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden; }
+        body { background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden; top: 0px !important; }
         
         header { width: 100%; background: white; border-bottom: 1px solid #e2e8f0; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; z-index: 20; flex-wrap: wrap; gap: 10px; }
         .header-logo { font-size: 1.4rem; font-weight: 800; background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         
-        .goog-te-banner-frame.skiptranslate { display: none !important; }
+        /* Nasconde del tutto la barra / selettore visivo di Google Translate */
+        .goog-te-banner-frame.skiptranslate, .goog-te-gadget { display: none !important; }
+        #google_translate_element { display: none !important; }
         body { top: 0px !important; }
-        #google_translate_element select { padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; color: var(--primary); font-weight: 600; font-size: 0.85rem; outline: none; cursor: pointer; }
 
         .app-container { display: flex; flex: 1; position: relative; width: 100%; }
         
@@ -126,10 +127,13 @@
 </head>
 <body>
 
+    <!-- Elemento Google Translate nascosto -->
+    <div id="google_translate_element"></div>
+
     <header>
         <div class="header-logo">⚡ MyClothes</div>
         <div class="header-right">
-            <div id="google_translate_element"></div>
+            <button type="button" class="btn btn-outline" style="padding: 6px 12px; font-size: 0.85rem;" onclick="apriModalLinguaManuale()">🌐 Lingua</button>
 
             {% if user_email %}
                 <span style="font-size: 0.9rem; font-weight: 600; color: var(--primary);">👤 {{ user_email }}</span>
@@ -156,7 +160,7 @@
             <div id="vista-home" class="view-section active">
                 <div class="hero">
                     <h1>Qualsiasi capo desideri. 100% Affidabili.</h1>
-                    <p>Selezioniamo i migliori capi streetwear e di lusso. Ecco come funziona l'acquisto passo dopo passo:</p>
+                    <p>Selezioniamo i migliori capi streetwear e di lusso. Ecco come funciona l'acquisto passo dopo passo:</p>
                 </div>
 
                 <h2 style="font-size: 1.3rem; color: var(--primary); font-weight: 800; margin-bottom: 15px;">📖 Come ordinare su MyClothes:</h2>
@@ -384,59 +388,60 @@
         </div>
     </div>
 
-    <!-- Modal Selezione Lingua (6 lingue più usate + Italiano) -->
+    <!-- Modal Selezione Lingua (6 Lingue Mondiali + Italiano) -->
     <div class="modal" id="modalLingua" style="display: none;">
         <div class="modal-content language-modal-content">
+            <button type="button" class="close-btn" onclick="chiudiModalLingua()">&times;</button>
             <div class="language-header">
                 <div class="lang-icon-badge">🌐</div>
                 <h2>Scegli la tua lingua</h2>
-                <p>Select your preferred language / 请选择您的语言</p>
+                <p>Select your preferred language / Seleccione su idioma</p>
             </div>
             
             <div class="language-grid">
-                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('it', 'Italiano')">
+                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('it')">
                     <span class="flag">🇮🇹</span>
                     <div>
                         <span class="lang-name">Italiano</span>
                         <span class="lang-native">Italian</span>
                     </div>
                 </button>
-                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('en', 'English')">
+                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('en')">
                     <span class="flag">🇬🇧</span>
                     <div>
                         <span class="lang-name">English</span>
                         <span class="lang-native">English</span>
                     </div>
                 </button>
-                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('zh-CN', '中文')">
-                    <span class="flag">🇨🇳</span>
+                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('pt')">
+                    <span class="flag">🇵🇹</span>
                     <div>
-                        <span class="lang-name">Chinese</span>
-                        <span class="lang-native">中文</span>
+                        <span class="lang-name">Português</span>
+                        <span class="lang-native">Portuguese</span>
                     </div>
                 </button>
-                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('hi', 'Hindi')">
+                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('hi')">
                     <span class="flag">🇮🇳</span>
                     <div>
                         <span class="lang-name">Hindi</span>
                         <span class="lang-native">हिन्दी</span>
                     </div>
                 </button>
-                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('es', 'Español')">
+                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('es')">
                     <span class="flag">🇪🇸</span>
                     <div>
-                        <span class="lang-name">Spanish</span>
-                        <span class="lang-native">Español</span>
+                        <span class="lang-name">Español</span>
+                        <span class="lang-native">Spanish</span>
                     </div>
                 </button>
-                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('fr', 'Français')">
+                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('fr')">
                     <span class="flag">🇫🇷</span>
                     <div>
-                        <span class="lang-name">French</span>
-                        <span class="lang-native">Français</span>
+                        <span class="lang-name">Français</span>
+                        <span class="lang-native">French</span>
                     </div>
                 </button>
-                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('ar', 'Arabic')">
+                <button type="button" class="lang-card" onclick="selezionaEImpostaLingua('ar')">
                     <span class="flag">🇸🇦</span>
                     <div>
                         <span class="lang-name">Arabic</span>
@@ -452,18 +457,20 @@
         function googleTranslateElementInit() {
             new google.translate.TranslateElement({
                 pageLanguage: 'it',
-                includedLanguages: 'it,en,zh-CN,hi,es,fr,ar',
+                includedLanguages: 'it,en,pt,hi,es,fr,ar',
                 layout: google.translate.TranslateElement.InlineLayout.SIMPLE
             }, 'google_translate_element');
         }
 
-        // Controllo prima visita per mostrare il modal lingua
+        // Gestione Traduzione e Apertura Modal Lingua
         document.addEventListener("DOMContentLoaded", function() {
             const linguaSalvata = localStorage.getItem('myclothes_language_selected');
             if (!linguaSalvata) {
                 setTimeout(() => {
                     document.getElementById('modalLingua').style.display = 'flex';
-                }, 500);
+                }, 600);
+            } else if (linguaSalvata !== 'it') {
+                applicaTraduzioneGoogle(linguaSalvata);
             }
 
             document.querySelectorAll('.view-section').forEach(el => {
@@ -477,17 +484,43 @@
             setInterval(aggiornaDatiClienteInTempoReale, 9000);
         });
 
+        function apriModalLinguaManuale() {
+            document.getElementById('modalLingua').style.display = 'flex';
+        }
+
+        function chiudiModalLingua() {
+            document.getElementById('modalLingua').style.display = 'none';
+        }
+
         function selezionaEImpostaLingua(codiceLingua) {
             localStorage.setItem('myclothes_language_selected', codiceLingua);
-            document.getElementById('modalLingua').style.display = 'none';
+            chiudiModalLingua();
 
-            if (codiceLingua === 'it') return;
-
-            const translateSelect = document.querySelector('#google_translate_element select');
-            if (translateSelect) {
-                translateSelect.value = codiceLingua;
-                translateSelect.dispatchEvent(new Event('change'));
+            if (codiceLingua === 'it') {
+                // Se seleziona italiano ricarica per tornare all'originale
+                let googCombo = document.querySelector('.goog-te-combo');
+                if(googCombo && googCombo.value !== '') {
+                    googCombo.value = '';
+                    googCombo.dispatchEvent(new Event('change'));
+                }
+                location.reload();
+            } else {
+                applicaTraduzioneGoogle(codiceLingua);
             }
+        }
+
+        function applicaTraduzioneGoogle(codiceLingua) {
+            let tentativi = 0;
+            let intervallo = setInterval(() => {
+                tentativi++;
+                let googCombo = document.querySelector('.goog-te-combo');
+                if (googCombo) {
+                    googCombo.value = codiceLingua;
+                    googCombo.dispatchEvent(new Event('change'));
+                    clearInterval(intervallo);
+                }
+                if (tentativi > 30) clearInterval(intervallo);
+            }, 300);
         }
 
         function mostraVista(nomeVista, elementoBtn) {
