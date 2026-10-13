@@ -18,7 +18,7 @@
         .header-logo { font-size: 1.4rem; font-weight: 800; background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         
-        /* Nasconde del tutto la barra / selettore visivo di Google Translate */
+        /* Nasconde la barra di Google Translate */
         .goog-te-banner-frame.skiptranslate, .goog-te-gadget { display: none !important; }
         #google_translate_element { display: none !important; }
         body { top: 0px !important; }
@@ -127,7 +127,7 @@
 </head>
 <body>
 
-    <!-- Elemento Google Translate nascosto -->
+    <!-- Elemento Google Translate nascosto ma attivo -->
     <div id="google_translate_element"></div>
 
     <header>
@@ -160,7 +160,7 @@
             <div id="vista-home" class="view-section active">
                 <div class="hero">
                     <h1>Qualsiasi capo desideri. 100% Affidabili.</h1>
-                    <p>Selezioniamo i migliori capi streetwear e di lusso. Ecco come funciona l'acquisto passo dopo passo:</p>
+                    <p>Selezioniamo i migliori capi streetwear e di lusso. Ecco come funziona l'acquisto passo dopo passo:</p>
                 </div>
 
                 <h2 style="font-size: 1.3rem; color: var(--primary); font-weight: 800; margin-bottom: 15px;">📖 Come ordinare su MyClothes:</h2>
@@ -452,7 +452,7 @@
         </div>
     </div>
 
-    <!-- Script Google Translate & Logica Sito -->
+    <!-- Script Google Translate & Funzionamento Traduzione -->
     <script type="text/javascript">
         function googleTranslateElementInit() {
             new google.translate.TranslateElement({
@@ -462,15 +462,13 @@
             }, 'google_translate_element');
         }
 
-        // Gestione Traduzione e Apertura Modal Lingua
+        // Controllo della lingua al caricamento della pagina
         document.addEventListener("DOMContentLoaded", function() {
             const linguaSalvata = localStorage.getItem('myclothes_language_selected');
             if (!linguaSalvata) {
                 setTimeout(() => {
                     document.getElementById('modalLingua').style.display = 'flex';
                 }, 600);
-            } else if (linguaSalvata !== 'it') {
-                applicaTraduzioneGoogle(linguaSalvata);
             }
 
             document.querySelectorAll('.view-section').forEach(el => {
@@ -497,30 +495,17 @@
             chiudiModalLingua();
 
             if (codiceLingua === 'it') {
-                // Se seleziona italiano ricarica per tornare all'originale
-                let googCombo = document.querySelector('.goog-te-combo');
-                if(googCombo && googCombo.value !== '') {
-                    googCombo.value = '';
-                    googCombo.dispatchEvent(new Event('change'));
-                }
+                // Rimuove i cookie di traduzione per tornare all'italiano originale
+                document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=" + location.hostname;
                 location.reload();
             } else {
-                applicaTraduzioneGoogle(codiceLingua);
+                // Imposta il cookie ufficiale di traduzione Google e ricarica per applicarla
+                let valoreCookie = '/it/' + codiceLingua;
+                document.cookie = "googtrans=" + valoreCookie + "; path=/;";
+                document.cookie = "googtrans=" + valoreCookie + "; path=/; domain=" + location.hostname;
+                location.reload();
             }
-        }
-
-        function applicaTraduzioneGoogle(codiceLingua) {
-            let tentativi = 0;
-            let intervallo = setInterval(() => {
-                tentativi++;
-                let googCombo = document.querySelector('.goog-te-combo');
-                if (googCombo) {
-                    googCombo.value = codiceLingua;
-                    googCombo.dispatchEvent(new Event('change'));
-                    clearInterval(intervallo);
-                }
-                if (tentativi > 30) clearInterval(intervallo);
-            }, 300);
         }
 
         function mostraVista(nomeVista, elementoBtn) {
