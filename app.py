@@ -1023,7 +1023,7 @@ def api_admin_dati():
       }
       for ur in user_rows
   ]
-  email_per_uid = {ur[2]: ur[0] for ur in user_rows}
+  email_per_uid = {ur[1]: ur[0] for ur in user_rows}
 
   execute_query(
       cursor,
