@@ -22,6 +22,7 @@
             <p class="error">⚠️ Password errata!</p>
         {% endif %}
         <form method="POST">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
             <input type="password" name="password" placeholder="Inserisci Password Admin" required>
             <button type="submit" class="btn">Accedi al Pannello Admin</button>
         </form>

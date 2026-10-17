@@ -352,8 +352,6 @@
                     <div class="form-group"><label>Password</label><input type="password" name="password" required placeholder="La tua password"></div>
                     <button type="submit" class="btn" style="width: 100%;">Accedi</button>
                 </form>
-                <div class="divider"><span>oppure</span></div>
-                <button type="button" class="btn-google" onclick="loginConGoogle()">Accedi con Google</button>
             </div>
             <div id="formRegister" style="display: {% if active_tab == 'register' %}block{% else %}none{% endif %};">
                 <form action="/registra-utente" method="POST">
@@ -362,8 +360,6 @@
                     <div class="form-group"><label>Conferma Password</label><input type="password" name="password_confirm" required placeholder="Ripeti la password"></div>
                     <button type="submit" class="btn" style="width: 100%;">Crea Account</button>
                 </form>
-                <div class="divider"><span>oppure</span></div>
-                <button type="button" class="btn-google" onclick="loginConGoogle()">Registrati con Google</button>
             </div>
         </div>
     </div>
@@ -454,6 +450,45 @@
 
     <!-- Script Google Translate & Funzionamento Traduzione -->
     <script type="text/javascript">
+        function sanitizeHTML(value) {
+            const template = document.createElement('template');
+            template.innerHTML = String(value);
+            const allowedTags = new Set(['DIV', 'P', 'STRONG', 'SPAN', 'IMG', 'BR', 'FORM', 'BUTTON', 'SELECT', 'OPTION', 'INPUT', 'H4']);
+            const allowedAttrs = new Set(['alt', 'class', 'id', 'name', 'type', 'value', 'placeholder', 'required', 'style', 'method', 'action']);
+            template.content.querySelectorAll('*').forEach((element) => {
+                if (!allowedTags.has(element.tagName)) {
+                    element.replaceWith(document.createTextNode(element.textContent || ''));
+                    return;
+                }
+                [...element.attributes].forEach((attribute) => {
+                    const name = attribute.name.toLowerCase();
+                    const value = attribute.value.trim();
+                    const safeHandler = /^(modificaMessaggioUtente|eliminaMessaggioUtente)\([0-9]+\)$/.test(value);
+                    if (name.startsWith('on') && !safeHandler) element.removeAttribute(attribute.name);
+                    if (!name.startsWith('on') && !allowedAttrs.has(name)) element.removeAttribute(attribute.name);
+                    if ((name === 'src' || name === 'action') && !/^(https:\/\/|\/|data:image\/(png|jpeg|gif|webp);base64,)/i.test(value)) element.removeAttribute(attribute.name);
+                });
+            });
+            return template.innerHTML;
+        }
+
+        const csrfToken = "{{ csrf_token() }}";
+        const nativeFetch = window.fetch.bind(window);
+        window.fetch = (url, options = {}) => {
+            const headers = new Headers(options.headers || {});
+            if ((options.method || 'GET').toUpperCase() !== 'GET') headers.set('X-CSRF-Token', csrfToken);
+            return nativeFetch(url, { ...options, headers });
+        };
+        document.addEventListener('submit', (event) => {
+            if (!event.target.querySelector('input[name="_csrf_token"]')) {
+                const field = document.createElement('input');
+                field.type = 'hidden';
+                field.name = '_csrf_token';
+                field.value = csrfToken;
+                event.target.appendChild(field);
+            }
+        });
+
         function googleTranslateElementInit() {
             new google.translate.TranslateElement({
                 pageLanguage: 'it',
@@ -634,7 +669,7 @@
                     html += `<div class="message-bubble ${r.mittente}">${mittenteLabel}<span id="u-msg-text-${r.id}">${r.testo}</span>${imgTag}${actionButtons}</div>`;
                 });
                 const eraInFondo = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 50;
-                chatBox.innerHTML = html;
+                chatBox.innerHTML = sanitizeHTML(html);
                 if(eraInFondo) { scrollChatDown(); }
             });
 
@@ -644,7 +679,7 @@
                 const container = document.getElementById('ordiniContainer');
                 if(!container) return;
                 if(ordini.length === 0) {
-                    container.innerHTML = '<p style="color: #94a3b8; font-style: italic;" id="noOrdiniText">Nessun ordine registrato al momento.</p>';
+                    container.innerHTML = sanitizeHTML('<p style="color: #94a3b8; font-style: italic;" id="noOrdiniText">Nessun ordine registrato al momento.</p>');
                     return;
                 }
                 let html = '';
@@ -696,7 +731,7 @@
                     }
                     html += `</div>`;
                 });
-                container.innerHTML = html;
+                container.innerHTML = sanitizeHTML(html);
             });
         }
 
@@ -717,18 +752,6 @@
                 document.getElementById('btnTabLogin').classList.remove('active');
                 document.getElementById('btnTabRegister').classList.add('active');
             }
-        }
-        function loginConGoogle() {
-            let emailGoogle = prompt("Inserisci la tua email Google per accedere:");
-            if(!emailGoogle || !emailGoogle.includes('@')) { alert("Email non valida."); return; }
-            let passGoogle = prompt("Inserisci la tua password di accesso:");
-            if(!passGoogle) { alert("La password è obbligatoria per accedere."); return; }
-
-            fetch('/login-google', {
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: emailGoogle.trim().toLowerCase(), password: passGoogle.trim() })
-            }).then(res => { if(res.ok) { location.reload(); } else { alert("Password o credenziali errate!"); } });
         }
         function apriPagamento() { document.getElementById('modalPagamento').style.display = 'flex'; }
         function chiudiPagamento() { document.getElementById('modalPagamento').style.display = 'none'; }
