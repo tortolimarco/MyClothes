@@ -132,6 +132,49 @@
     </div>
 
     <script>
+        function sanitizeHTML(value) {
+            const template = document.createElement('template');
+            template.innerHTML = String(value);
+            const allowedTags = new Set(['DIV', 'P', 'STRONG', 'SPAN', 'IMG', 'BR', 'FORM', 'BUTTON', 'SELECT', 'OPTION', 'INPUT', 'H4']);
+            const allowedAttrs = new Set(['alt', 'class', 'id', 'name', 'type', 'value', 'placeholder', 'required', 'style', 'method', 'action', 'data-user-id', 'data-email']);
+            template.content.querySelectorAll('*').forEach((element) => {
+                if (!allowedTags.has(element.tagName)) {
+                    element.replaceWith(document.createTextNode(element.textContent || ''));
+                    return;
+                }
+                [...element.attributes].forEach((attribute) => {
+                    const name = attribute.name.toLowerCase();
+                    const value = attribute.value.trim();
+                    const safeHandler = /^(modificaMessaggioAdmin|eliminaMessaggioAdmin)\([0-9]+\)$/.test(value);
+                    if (name.startsWith('on') && !safeHandler) element.removeAttribute(attribute.name);
+                    if (!name.startsWith('on') && !allowedAttrs.has(name)) element.removeAttribute(attribute.name);
+                    if ((name === 'src' || name === 'action') && !/^(https:\/\/|\/|data:image\/(png|jpeg|gif|webp);base64,)/i.test(value)) element.removeAttribute(attribute.name);
+                });
+            });
+            return template.innerHTML;
+        }
+
+        function escapeAttribute(value) {
+            return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        const csrfToken = "{{ csrf_token() }}";
+        const nativeFetch = window.fetch.bind(window);
+        window.fetch = (url, options = {}) => {
+            const headers = new Headers(options.headers || {});
+            if ((options.method || 'GET').toUpperCase() !== 'GET') headers.set('X-CSRF-Token', csrfToken);
+            return nativeFetch(url, { ...options, headers });
+        };
+        document.addEventListener('submit', (event) => {
+            if (!event.target.querySelector('input[name="_csrf_token"]')) {
+                const field = document.createElement('input');
+                field.type = 'hidden';
+                field.name = '_csrf_token';
+                field.value = csrfToken;
+                event.target.appendChild(field);
+            }
+        });
+
         let currentSelectedUserId = null;
 
         function formattaData(dataStr) {
@@ -211,7 +254,7 @@
                         }
                         html += `</div></div>`;
                     });
-                    attiviContainer.innerHTML = html;
+                    attiviContainer.innerHTML = sanitizeHTML(html);
                 }
 
                 const archiviatiContainer = document.getElementById('adminOrdiniArchiviatiContainer');
@@ -229,7 +272,7 @@
                         }
                         htmlArch += `</div>`;
                     });
-                    archiviatiContainer.innerHTML = htmlArch;
+                    archiviatiContainer.innerHTML = sanitizeHTML(htmlArch);
                 }
 
                 const sidebar = document.getElementById('adminChatSidebar');
@@ -240,12 +283,15 @@
                     for (const [userId, messaggi] of Object.entries(data.chat_per_utente)) {
                         let emailCli = data.email_per_uid[userId] || 'Cliente Anonimo';
                         let activeClass = currentSelectedUserId === userId ? 'active' : '';
-                        sidebarHtml += `<div class="chat-contact ${activeClass}" id="contact-${userId}" onclick="selezionaChat('${userId}', '${emailCli}')">
+                        sidebarHtml += `<div class="chat-contact ${activeClass}" id="contact-${escapeAttribute(userId)}" data-user-id="${escapeAttribute(userId)}" data-email="${escapeAttribute(emailCli)}">
                             <div class="chat-contact-title">👤 ${emailCli}</div>
                             <div class="chat-contact-sub">ID: ${userId}</div>
                         </div>`;
                     }
-                    sidebar.innerHTML = sidebarHtml;
+                    sidebar.innerHTML = sanitizeHTML(sidebarHtml);
+                    sidebar.querySelectorAll('.chat-contact').forEach((contact) => {
+                        contact.addEventListener('click', () => selezionaChat(contact.dataset.userId, contact.dataset.email));
+                    });
                 }
 
                 const utentiContainer = document.getElementById('adminUtentiContainer');
@@ -261,7 +307,7 @@
                             <p style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">🕒 Data Creazione: ${formattaData(u.data)}</p>
                         </div>`;
                     });
-                    utentiContainer.innerHTML = utentiHtml;
+                    utentiContainer.innerHTML = sanitizeHTML(utentiHtml);
                 }
 
                 const visitatoriContainer = document.getElementById('adminVisitatoriContainer');
@@ -286,7 +332,7 @@
                             <p style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">🕒 Ultimo accesso: <strong>${formattaData(v.ultimo_accesso)}</strong></p>
                         </div>`;
                     });
-                    visitatoriContainer.innerHTML = visHtml;
+                    visitatoriContainer.innerHTML = sanitizeHTML(visHtml);
                 }
 
                 const recensioniContainer = document.getElementById('adminRecensioniContainer');
@@ -307,7 +353,7 @@
                             <button type="submit" class="btn btn-danger" style="font-size: 0.8rem;">🗑️ Elimina Recensione</button>
                         </form></div>`;
                     });
-                    recensioniContainer.innerHTML = recHtml;
+                    recensioniContainer.innerHTML = sanitizeHTML(recHtml);
                 }
 
                 if(currentSelectedUserId) {
@@ -355,7 +401,7 @@
                 });
 
                 const eraInFondo = msgBox.scrollHeight - msgBox.scrollTop <= msgBox.clientHeight + 50;
-                msgBox.innerHTML = html;
+                msgBox.innerHTML = sanitizeHTML(html);
                 if(eraInFondo) { msgBox.scrollTop = msgBox.scrollHeight; }
             });
         }

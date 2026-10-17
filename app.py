@@ -10,12 +10,90 @@ from flask import (
 import uuid
 import sqlite3
 import os
+import secrets
+import hmac
+import time
+from decimal import Decimal, InvalidOperation
+from urllib.parse import urlparse
+
+from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
-app.secret_key = "chiave_segreta_super_sicura_myclothes"
+# Secrets must be supplied by the hosting environment. The fallback keeps local
+# development usable but intentionally invalidates sessions after a restart.
+app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_urlsafe(48)
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    MAX_CONTENT_LENGTH=2 * 1024 * 1024,
+)
 
-ADMIN_PASSWORD = "myclothesadmin!"
-DB_NAME = "myclothes.db"
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
+DB_NAME = os.environ.get("DB_NAME", "myclothes.db")
+LOGIN_ATTEMPTS = {}
+
+
+def rate_limited(key, limit=5, window=900):
+  now = time.monotonic()
+  attempts = [stamp for stamp in LOGIN_ATTEMPTS.get(key, []) if now - stamp < window]
+  if len(attempts) >= limit:
+    LOGIN_ATTEMPTS[key] = attempts
+    return True
+  attempts.append(now)
+  LOGIN_ATTEMPTS[key] = attempts
+  return False
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://translate.google.com https://translate.googleapis.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://paypal.me",
+    )
+    return response
+
+
+def same_origin_request():
+    expected = request.host_url.rstrip("/")
+    origin = request.headers.get("Origin")
+    if origin:
+        return origin.rstrip("/") == expected
+    referer = request.headers.get("Referer")
+    if referer:
+        parsed = urlparse(referer)
+        return f"{parsed.scheme}://{parsed.netloc}" == expected
+    return True
+
+
+def csrf_token():
+    token = session.get("_csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["_csrf_token"] = token
+    return token
+
+
+@app.context_processor
+def inject_security_helpers():
+    return {"csrf_token": csrf_token}
+
+
+@app.before_request
+def reject_cross_origin_mutations():
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"} and not same_origin_request():
+        return jsonify({"status": "error", "message": "Richiesta non autorizzata."}), 403
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        supplied_token = request.headers.get("X-CSRF-Token") or request.form.get("_csrf_token")
+        expected_token = session.get("_csrf_token")
+        if not supplied_token or not expected_token or not hmac.compare_digest(supplied_token, expected_token):
+            return jsonify({"status": "error", "message": "Token CSRF non valido."}), 403
+    return None
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
@@ -181,11 +259,37 @@ def init_db():
   release_db_connection(conn)
 
 
+def migrate_legacy_passwords():
+  conn = get_db_connection()
+  cursor = conn.cursor()
+  execute_query(cursor, "SELECT email, password FROM utenti")
+  rows = cursor.fetchall()
+  for email, stored_password in rows:
+    if stored_password and not stored_password.startswith(("scrypt:", "pbkdf2:")):
+      execute_query(
+          cursor,
+          "UPDATE utenti SET password = ? WHERE email = ?",
+          (generate_password_hash(stored_password), email),
+      )
+  conn.commit()
+  cursor.close()
+  release_db_connection(conn)
+
+
 init_db()
+migrate_legacy_passwords()
 
 
 def get_current_user():
   return session.get("user_email")
+
+
+def mask_email(email):
+  if not email or "@" not in email:
+    return "Cliente"
+  local, domain = email.split("@", 1)
+  visible = (local[:1] + "***") if local else "***"
+  return f"{visible}@{domain}"
 
 
 def get_user_id():
@@ -222,7 +326,7 @@ def registra_visitatore(uid):
         """
             INSERT INTO visitatori (user_id, user_agent, ip_address, ultimo_accesso)
             VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(user_id) DO UPDATE SET 
+            ON CONFLICT(user_id) DO UPDATE SET
             ultimo_accesso = CURRENT_TIMESTAMP,
             user_agent = excluded.user_agent,
             ip_address = excluded.ip_address
@@ -294,7 +398,7 @@ def home():
   tutte_recensioni = [
       {
           "codice_ordine": r[0],
-          "email": r[1],
+          "email": mask_email(r[1]),
           "prodotto": r[2],
           "stelle": r[3],
           "commento": r[4],
@@ -322,6 +426,11 @@ def login_utente():
   email = request.form.get("email", "").strip().lower()
   password = request.form.get("password", "").strip()
 
+  if rate_limited(f"user:{request.remote_addr}:{email}"):
+    session["auth_error"] = "Troppi tentativi. Riprova più tardi."
+    session["active_tab"] = "login"
+    return redirect(url_for("home"))
+
   if not email or not password:
     session["auth_error"] = (
         "Inserisci sia l'email che la password per accedere."
@@ -343,11 +452,27 @@ def login_utente():
     session["active_tab"] = "login"
     return redirect(url_for("home"))
 
-  if row[0] != password:
+  stored_password = row[0] or ""
+  valid_password = (
+      check_password_hash(stored_password, password)
+      if stored_password.startswith(("scrypt:", "pbkdf2:"))
+      else hmac.compare_digest(stored_password, password)
+  )
+  if not valid_password:
     session["auth_error"] = "Password errata! Riprova."
     session["active_tab"] = "login"
     return redirect(url_for("home"))
 
+  LOGIN_ATTEMPTS.pop(f"user:{request.remote_addr}:{email}", None)
+  # Upgrade legacy plaintext passwords after a successful login.
+  if not stored_password.startswith(("scrypt:", "pbkdf2:")):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    execute_query(cursor, "UPDATE utenti SET password = ? WHERE email = ?", (generate_password_hash(password), email))
+    conn.commit()
+    cursor.close()
+    release_db_connection(conn)
+  session.clear()
   session["user_email"] = email
   session["user_id"] = row[1]
   return redirect(url_for("home"))
@@ -368,6 +493,10 @@ def registra_utente():
     session["auth_error"] = "Le due password non coincidono!"
     session["active_tab"] = "register"
     return redirect(url_for("home"))
+  if len(password) < 12:
+    session["auth_error"] = "La password deve contenere almeno 12 caratteri."
+    session["active_tab"] = "register"
+    return redirect(url_for("home"))
 
   conn = get_db_connection()
   cursor = conn.cursor()
@@ -383,7 +512,7 @@ def registra_utente():
   execute_query(
       cursor,
       "INSERT INTO utenti (email, password, user_id) VALUES (?, ?, ?)",
-      (email, password, user_id),
+      (email, generate_password_hash(password), user_id),
   )
   conn.commit()
   cursor.close()
@@ -392,55 +521,6 @@ def registra_utente():
   session["user_email"] = email
   session["user_id"] = user_id
   return redirect(url_for("home"))
-
-
-@app.route("/login-google", methods=["POST"])
-def login_google():
-  data = request.get_json() or {}
-  email = data.get("email", "").strip().lower()
-  password = data.get("password", "").strip()
-
-  if not email or not password:
-    return (
-        jsonify(
-            {"status": "error", "message": "Email e password richieste."}
-        ),
-        400,
-    )
-
-  conn = get_db_connection()
-  cursor = conn.cursor()
-  execute_query(
-      cursor, "SELECT password, user_id FROM utenti WHERE email = ?", (email,)
-  )
-  row = cursor.fetchone()
-
-  if row:
-    if row[0] != password:
-      cursor.close()
-      release_db_connection(conn)
-      return (
-          jsonify({
-              "status": "error",
-              "message": "Password errata per questo account!",
-          }),
-          401,
-      )
-    user_id = row[1]
-  else:
-    user_id = session.get("user_id", str(uuid.uuid4()))
-    execute_query(
-        cursor,
-        "INSERT INTO utenti (email, password, user_id) VALUES (?, ?, ?)",
-        (email, password, user_id),
-    )
-    conn.commit()
-
-  cursor.close()
-  release_db_connection(conn)
-  session["user_email"] = email
-  session["user_id"] = user_id
-  return jsonify({"status": "success"})
 
 
 @app.route("/logout-utente")
@@ -607,6 +687,14 @@ def registra_pagamento():
   uid = get_user_id()
   email = get_current_user()
   data = request.get_json() or {}
+  prodotto = str(data.get("prodotto", "")).strip()
+  metodo = str(data.get("metodo", "")).strip()
+  try:
+    importo = Decimal(str(data.get("importo", "")))
+  except (InvalidOperation, ValueError):
+    return jsonify({"status": "error", "message": "Importo non valido."}), 400
+  if not prodotto or len(prodotto) > 200 or metodo != "PayPal" or importo <= 0 or importo > Decimal("100000"):
+    return jsonify({"status": "error", "message": "Dati ordine non validi."}), 400
 
   conn = get_db_connection()
   cursor = conn.cursor()
@@ -616,7 +704,7 @@ def registra_pagamento():
   execute_query(cursor, "UPDATE contatore SET valore = ? WHERE id = 1", (val,))
 
   codice_ordine = f"#{val:04d}"
-  ordine_id = str(uuid.uuid4())[:8]
+  ordine_id = str(uuid.uuid4())
 
   execute_query(
       cursor,
@@ -629,9 +717,9 @@ def registra_pagamento():
           codice_ordine,
           uid,
           email,
-          data.get("prodotto"),
-          data.get("importo"),
-          data.get("metodo"),
+          prodotto,
+          str(importo.quantize(Decimal("0.01"))),
+          metodo,
           "In attesa di verifica pagamento",
           "",
           "",
@@ -649,9 +737,14 @@ def registra_pagamento():
 
 @app.route("/salva-spedizione/<ordine_id>", methods=["POST"])
 def salva_spedizione(ordine_id):
-  nome = request.form.get("nome")
-  indirizzo = request.form.get("indirizzo")
-  citta = request.form.get("citta")
+  uid = get_user_id() if get_current_user() else None
+  if not uid:
+    return redirect(url_for("home"))
+  nome = request.form.get("nome", "").strip()
+  indirizzo = request.form.get("indirizzo", "").strip()
+  citta = request.form.get("citta", "").strip()
+  if not all((nome, indirizzo, citta)) or any(len(v) > 200 for v in (nome, indirizzo, citta)):
+    return redirect(url_for("home"))
 
   conn = get_db_connection()
   cursor = conn.cursor()
@@ -659,9 +752,9 @@ def salva_spedizione(ordine_id):
       cursor,
       (
           "UPDATE ordini SET nome = ?, indirizzo = ?, citta = ?, stato = 'In"
-          " elaborazione' WHERE id = ?"
+          " elaborazione' WHERE id = ? AND user_id = ? AND stato = 'Pagamento Verificato - Inserisci Spedizione'"
       ),
-      (nome, indirizzo, citta, ordine_id),
+      (nome, indirizzo, citta, ordine_id, uid),
   )
   conn.commit()
   cursor.close()
@@ -672,15 +765,18 @@ def salva_spedizione(ordine_id):
 
 @app.route("/elimina-ordine-cliente/<ordine_id>", methods=["POST"])
 def elimina_ordine_cliente(ordine_id):
+  uid = get_user_id() if get_current_user() else None
+  if not uid:
+    return redirect(url_for("home"))
   conn = get_db_connection()
   cursor = conn.cursor()
   execute_query(
       cursor,
       (
-          "DELETE FROM ordini WHERE id = ? AND (stato = 'Arrivato' OR stato ="
+          "DELETE FROM ordini WHERE id = ? AND user_id = ? AND (stato = 'Arrivato' OR stato ="
           " 'Annullato')"
       ),
-      (ordine_id,),
+      (ordine_id, uid),
   )
   conn.commit()
   cursor.close()
@@ -705,8 +801,8 @@ def invia_recensione(ordine_id):
 
   execute_query(
       cursor,
-      "SELECT codice, prodotto, stato FROM ordini WHERE id = ?",
-      (ordine_id,),
+      "SELECT codice, prodotto, stato FROM ordini WHERE id = ? AND user_id = ?",
+      (ordine_id, get_user_id()),
   )
   row = cursor.fetchone()
   if row and row[2] == "Arrivato":
@@ -744,7 +840,11 @@ def admin():
 
   errore = False
   if request.method == "POST":
-    if request.form.get("password") == ADMIN_PASSWORD:
+    if rate_limited(f"admin:{request.remote_addr}"):
+      return render_template("login.html", errore=True), 429
+    if ADMIN_PASSWORD and hmac.compare_digest(request.form.get("password", ""), ADMIN_PASSWORD):
+      LOGIN_ATTEMPTS.pop(f"admin:{request.remote_addr}", None)
+      session.clear()
       session["admin_logged_in"] = True
       return render_template("admin.html")
     else:
@@ -912,15 +1012,14 @@ def api_admin_dati():
     )
 
   execute_query(
-      cursor, "SELECT email, password, user_id, data_creazione FROM utenti"
+      cursor, "SELECT email, user_id, data_creazione FROM utenti"
   )
   user_rows = cursor.fetchall()
   lista_utenti = [
       {
           "email": ur[0],
-          "password": ur[1],
-          "user_id": ur[2],
-          "data": str(ur[3]),
+          "user_id": ur[1],
+          "data": str(ur[2]),
       }
       for ur in user_rows
   ]
@@ -1032,4 +1131,4 @@ def api_admin_rispondi(user_id):
 
 
 if __name__ == "__main__":
-  app.run(debug=True)
+  app.run(debug=False)
